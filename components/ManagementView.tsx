@@ -1,15 +1,15 @@
-
 import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import Card from './common/Card';
 import { SettingsContext } from '../contexts/SettingsContext';
 import { BaggageDataContext } from '../contexts/BaggageDataContext';
 import { User, BaggageRecord, WorldTracerConfig, AuditEntry, AuditCategory } from '../types';
-import { SettingsIcon, UserGroupIcon, PhotoIcon, TrashIcon, CheckCircleIcon, WorldIcon, UploadIcon, BellIcon } from './common/icons';
+import { SettingsIcon, UserGroupIcon, PhotoIcon, TrashIcon, CheckCircleIcon, WorldIcon, UploadIcon, BellIcon, SparklesIcon, ChartIcon } from './common/icons';
 import { base64FromFile } from '../utils/imageUtils';
 import BaggageTimer from './common/BaggageTimer';
+import StrategicSummary from './StrategicSummary';
 import Fuse from 'fuse.js';
 
-type ManagementTab = 'settings' | 'logistics' | 'audit' | 'security';
+type ManagementTab = 'logistics' | 'security' | 'audit' | 'settings' | 'strategic';
 
 const EditIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -595,7 +595,7 @@ const SettingsView: React.FC = () => (
 );
 
 const ManagementView: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<ManagementTab>('logistics');
+    const [activeTab, setActiveTab] = useState<ManagementTab>('strategic');
     return (
         <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -604,6 +604,9 @@ const ManagementView: React.FC = () => {
                     <p className="text-gray-400 text-sm mt-1">مراقبة العمليات، التحكم في اللوجستيات وإدارة تكامل الأنظمة</p>
                 </div>
                 <div className="bg-brand-gray-dark p-1 rounded-xl flex border border-brand-gray-light self-stretch md:self-auto shadow-2xl overflow-x-auto">
+                    <button onClick={() => setActiveTab('strategic')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'strategic' ? 'bg-brand-green text-brand-gray-dark shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+                        <SparklesIcon className="w-4 h-4" /> الملخص الاستراتيجي
+                    </button>
                     <button onClick={() => setActiveTab('logistics')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'logistics' ? 'bg-red-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>اللوجستيات</button>
                     <button onClick={() => setActiveTab('security')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'security' ? 'bg-brand-green text-brand-gray-dark shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                         <CheckCircleIcon className="w-4 h-4" /> التوثيق الأمني
@@ -614,6 +617,8 @@ const ManagementView: React.FC = () => {
                     <button onClick={() => setActiveTab('settings')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-brand-green text-brand-gray-dark shadow-lg' : 'text-gray-400 hover:text-white'}`}>الإعدادات</button>
                 </div>
             </div>
+            
+            {activeTab === 'strategic' && <StrategicSummary />}
             {activeTab === 'logistics' && <LogisticsView />}
             {activeTab === 'security' && <SecurityReportView />}
             {activeTab === 'audit' && <AuditLogView />}
