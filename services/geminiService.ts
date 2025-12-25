@@ -6,17 +6,18 @@ import { findBaggageByQuery as findInWorldTracer } from './worldTracerService';
 import { DATA_SOURCE_MODE } from '../constants';
 import { imageToBase64 } from '../utils/imageUtils';
 
+const MODEL_NAME = 'gemini-3-flash-preview';
+
 const cleanJsonResponse = (text: string): string => {
     return text.replace(/```json/g, '').replace(/```/g, '').trim();
 };
 
 /**
  * الحصول على مفتاح API الحالي
- * الأولوية لـ process.env.API_KEY المحقون أو المختار ديناميكياً
  */
 const getApiKey = (): string | undefined => {
     const key = process.env.API_KEY;
-    if (key && key !== 'undefined' && key !== 'null' && key.length > 5) {
+    if (key && key !== 'undefined' && key !== 'null' && key !== '' && key !== '${API_KEY}') {
         return key;
     }
     return undefined;
@@ -29,7 +30,6 @@ export const isAiReady = async (): Promise<boolean> => {
     const key = getApiKey();
     if (key) return true;
     
-    // فحص واجهة aistudio إذا كانت متاحة
     if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
         return await (window as any).aistudio.hasSelectedApiKey();
     }
@@ -86,10 +86,10 @@ export const getAiChatResponse = async (
     try {
         const ai = new GoogleGenAI({ apiKey });
         const systemInstruction = `
-        IDENTITY: SGS Smart Assistant for Saudi Ground Services.
-        LANGUAGE: Respond in ${lang === 'ar' ? 'Arabic' : 'English'}.
+        IDENTITY: SGS Strategic Assistant for Saudi Ground Services.
+        LANGUAGE: ${lang === 'ar' ? 'Arabic' : 'English'}.
         CONTEXT: ${JSON.stringify(baggageContext)}
-        RULES: Be brief (max 20 words), polite, and use context info only.
+        RULES: Be professional, brief, and provide accurate status based ONLY on context.
         `;
 
         const history = conversation.slice(0, -1).map(m => ({
@@ -99,13 +99,15 @@ export const getAiChatResponse = async (
 
         if (history.length > 0 && history[0].role === 'model') history.shift();
 
-        const chat = ai.chats.create({
-            model: 'gemini-3-flash-preview',
-            config: { systemInstruction, temperature: 0.2 },
-            history
+        const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: [
+                ...history,
+                { role: 'user', parts: [{ text: conversation[conversation.length - 1].text }] }
+            ],
+            config: { systemInstruction, temperature: 0.2 }
         });
 
-        const response = await chat.sendMessage({ message: conversation[conversation.length - 1].text });
         return response.text || "No response";
     } catch (err: any) {
         console.error("Gemini Error:", err);
@@ -128,7 +130,7 @@ export const findPotentialMatchesByDescription = async (
         const prompt = `Match description "${description}" from: ${JSON.stringify(bagsList)}. Return ONLY a JSON array of PIR strings.`;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: MODEL_NAME,
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             config: { responseMimeType: "application/json", temperature: 0.0 }
         });
@@ -154,10 +156,10 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
     }));
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_NAME,
         contents: [{ 
             role: 'user',
-            parts: [{ text: "Analyze baggage and return JSON structure with name, description, and features." }, ...imageParts] 
+            parts: [{ text: "Analyze this baggage. Return JSON with 'name' (if tag visible), 'description', and 'features' object (brand, color, size, type, distinctiveMarks)." }, ...imageParts] 
         }],
         config: { responseMimeType: "application/json", temperature: 0.1 }
     });
@@ -175,11 +177,11 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
     try {
         const [p64, s64] = await Promise.all([imageToBase64(pImg), imageToBase64(sImg)]);
         const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
+            model: MODEL_NAME,
             contents: [{ 
                 role: 'user',
                 parts: [
-                    { text: "Compare these 2 bag images. Determine if they are the same bag." },
+                    { text: "Strategic Security Comparison: Do these images show the exact same bag? Provide reasoning and a match percentage." },
                     { inlineData: { data: p64.base64, mimeType: p64.mimeType } },
                     { inlineData: { data: s64.base64, mimeType: s64.mimeType } }
                 ] 
@@ -193,7 +195,7 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
 export const getInitialBotMessage = (record: BaggageRecord, lang: 'ar' | 'en' = 'ar'): { chatResponse: string; baggageInfo: BaggageInfo } => {
     const baggageInfo = recordToBaggageInfo(record);
     const chatResponse = lang === 'ar' 
-        ? `تم تحديد سجل الحقيبة (${record.PIR}). كيف يمكنني مساعدتكم بخصوص هذه الرحلة؟`
-        : `Baggage record (${record.PIR}) located. How can I assist you further?`;
+        ? `تم العثور على سجل الحقيبة الخاصة بكم (${record.PIR}). نظام SGS الذكي تحت تصرفكم لمتابعة التسليم.`
+        : `Baggage record (${record.PIR}) located. SGS Smart System is ready to assist with your delivery.`;
     return { chatResponse, baggageInfo };
 };
