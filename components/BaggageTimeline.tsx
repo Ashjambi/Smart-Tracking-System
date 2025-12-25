@@ -2,10 +2,11 @@
 import React from 'react';
 import { BaggageInfo } from '../types';
 import Card from './common/Card';
+import { CheckCircleIcon } from './common/icons';
 
 const TimelineStep: React.FC<{isFirst?: boolean}> = ({ isFirst = false }) => (
     <div className={`absolute -start-4 flex items-center justify-center w-8 h-8 rounded-full ring-8 ring-brand-gray border ${isFirst ? 'bg-brand-green border-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.4)]' : 'bg-brand-gray-light border-white/10'}`}>
-        {/* تم حذف الأيقونة من داخل الدائرة */}
+        {isFirst && <CheckCircleIcon className="w-5 h-5 text-brand-gray-dark" />}
     </div>
 );
 
