@@ -479,6 +479,10 @@ const WorldTracerIntegration: React.FC = () => {
             <p className="text-sm text-gray-400 mb-6">أدخل بيانات اعتماد الموظف للربط المباشر مع النظام العالمي لتتبع الأمتعة (إنتاج أو اختبار).</p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-tighter">رابط الـ API الأساسي (Base URL)</label>
+                    <input type="text" value={localConfig.baseUrl} onChange={e => setLocalConfig({...localConfig, baseUrl: e.target.value})} className={inputStyle} placeholder="https://api.worldtracer.aero/v1" />
+                </div>
                 <div>
                     <label className="block text-xs font-bold text-gray-400 mb-1 uppercase tracking-tighter">معرف الوكيل (Agent ID)</label>
                     <input type="text" value={localConfig.agentId} onChange={e => setLocalConfig({...localConfig, agentId: e.target.value})} className={inputStyle} placeholder="مثال: SV-JED-001" />

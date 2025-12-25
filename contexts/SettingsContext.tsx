@@ -17,7 +17,9 @@ interface SettingsContextType {
 
 export const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
+// Fix: Added missing baseUrl property to match WorldTracerConfig interface
 const initialWtConfig: WorldTracerConfig = {
+    baseUrl: 'https://api.worldtracer.aero/v1',
     agentId: '',
     stationCode: '',
     airlineCode: 'SV',

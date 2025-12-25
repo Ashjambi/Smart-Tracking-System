@@ -99,6 +99,7 @@ export interface User {
 }
 
 export interface WorldTracerConfig {
+  baseUrl: string; // Real API Endpoint
   agentId: string;
   stationCode: string;
   airlineCode: string;
