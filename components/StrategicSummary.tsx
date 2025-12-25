@@ -26,7 +26,7 @@ const StrategicSummary: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in zoom-in-95 duration-700 max-w-5xl mx-auto pb-20 relative">
       {/* Confidential Watermark */}
-      <div className="absolute top-20 left-1/2 -translate-x-1/2 -rotate-12 pointer-events-none opacity-[0.03] select-none">
+      <div className="absolute top-40 left-1/2 -translate-x-1/2 -rotate-12 pointer-events-none opacity-[0.03] select-none z-0">
         <h1 className="text-[12rem] font-black text-white whitespace-nowrap">SGS STRATEGIC</h1>
       </div>
 
@@ -34,21 +34,22 @@ const StrategicSummary: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-brand-green/30 pb-6 gap-4 relative z-10">
         <div className="text-right">
           <div className="flex items-center gap-2 mb-2">
-            <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded font-black tracking-widest uppercase">Secret / Confidential</span>
+            <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded font-black tracking-widest uppercase shadow-lg shadow-red-600/20">Secret / Confidential</span>
+            <span className="bg-brand-green/20 text-brand-green text-[10px] px-2 py-0.5 rounded font-black uppercase tracking-widest border border-brand-green/30">v1.0 Internal</span>
           </div>
           <h2 className="text-4xl font-black text-white tracking-tight">وثيقة المبادرة الاستراتيجية</h2>
           <p className="text-brand-green font-bold text-lg mt-1">مشروع التحول الرقمي الذكي - وحدة الأمتعة 2025</p>
         </div>
         <button 
           onClick={handleCopy}
-          className="flex items-center gap-2 px-6 py-3 bg-brand-green text-brand-gray-dark rounded-xl hover:bg-brand-green-light transition-all font-black text-sm shadow-xl shadow-brand-green/20"
+          className="flex items-center gap-2 px-6 py-3 bg-brand-green text-brand-gray-dark rounded-xl hover:bg-brand-green-light transition-all font-black text-sm shadow-xl shadow-brand-green/20 transform hover:-translate-y-1 active:scale-95"
         >
           {copySuccess ? 'تم النسخ بنجاح ✓' : 'تصدير الملخص التنفيذي'}
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
-        <Card className="bg-gradient-to-br from-brand-gray-dark to-brand-gray border-l-4 border-l-brand-green shadow-2xl">
+        <Card className="bg-gradient-to-br from-brand-gray-dark to-brand-gray border-l-4 border-l-brand-green shadow-2xl hover:shadow-brand-green/10 transition-shadow">
            <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-brand-green/20 rounded-lg">
                 <SparklesIcon className="w-6 h-6 text-brand-green" />
@@ -60,7 +61,7 @@ const StrategicSummary: React.FC = () => {
            </p>
         </Card>
         
-        <Card className="bg-gradient-to-br from-brand-gray-dark to-brand-gray border-l-4 border-l-blue-500 shadow-2xl">
+        <Card className="bg-gradient-to-br from-brand-gray-dark to-brand-gray border-l-4 border-l-blue-500 shadow-2xl hover:shadow-blue-500/10 transition-shadow">
            <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <ChartIcon className="w-6 h-6 text-blue-500" />
@@ -72,7 +73,7 @@ const StrategicSummary: React.FC = () => {
            </p>
         </Card>
 
-        <Card className="bg-gradient-to-br from-brand-gray-dark to-brand-gray border-l-4 border-l-purple-500 shadow-2xl">
+        <Card className="bg-gradient-to-br from-brand-gray-dark to-brand-gray border-l-4 border-l-purple-500 shadow-2xl hover:shadow-purple-500/10 transition-shadow">
            <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-purple-500/20 rounded-lg">
                 <WorldIcon className="w-6 h-6 text-purple-500" />
@@ -95,9 +96,9 @@ const StrategicSummary: React.FC = () => {
           <table className="w-full text-right text-base">
             <thead>
               <tr className="bg-brand-gray-dark/80 text-white border-b border-brand-green/20">
-                <th className="p-5 font-black uppercase tracking-wider">المجال التشغيلي</th>
-                <th className="p-5 text-red-400 font-bold bg-red-400/5">المنهجية التقليدية</th>
-                <th className="p-5 text-brand-green font-bold bg-brand-green/5">مبادرة SGS Smart (المقترحة)</th>
+                <th className="p-5 font-black uppercase tracking-wider text-sm">المجال التشغيلي</th>
+                <th className="p-5 text-red-400 font-bold bg-red-400/5 text-sm">المنهجية التقليدية</th>
+                <th className="p-5 text-brand-green font-bold bg-brand-green/5 text-sm">مبادرة SGS Smart (المقترحة)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-gray-light/30">
@@ -122,22 +123,23 @@ const StrategicSummary: React.FC = () => {
       </section>
 
       {/* Strategic Goals Footer */}
-      <div className="bg-gradient-to-r from-brand-gray-dark to-brand-gray border border-brand-green/30 p-8 rounded-3xl shadow-2xl relative z-10">
-         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+      <div className="bg-gradient-to-r from-brand-gray-dark to-brand-gray border border-brand-green/30 p-8 rounded-3xl shadow-2xl relative z-10 overflow-hidden">
+         <div className="absolute top-0 right-0 w-32 h-32 bg-brand-green/5 blur-3xl rounded-full"></div>
+         <div className="flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
             <div className="space-y-2 text-center md:text-right">
                <h4 className="text-xl font-black text-white">أهداف عام 2025</h4>
                <p className="text-gray-400 text-sm">تم وضع هذه الأرقام بناءً على تحليل أداء محطة مطار الملك عبدالعزيز بجدة.</p>
             </div>
             <div className="flex flex-wrap justify-center gap-6">
-               <div className="bg-brand-gray-dark/80 px-6 py-4 rounded-2xl border border-brand-green/20 text-center min-w-[140px]">
+               <div className="bg-brand-gray-dark/80 px-6 py-4 rounded-2xl border border-brand-green/20 text-center min-w-[140px] shadow-lg">
                   <p className="text-[10px] text-brand-green font-black uppercase mb-1">أتمتة ذكية</p>
                   <p className="text-3xl font-black text-white">75%</p>
                </div>
-               <div className="bg-brand-gray-dark/80 px-6 py-4 rounded-2xl border border-blue-500/20 text-center min-w-[140px]">
+               <div className="bg-brand-gray-dark/80 px-6 py-4 rounded-2xl border border-blue-500/20 text-center min-w-[140px] shadow-lg">
                   <p className="text-[10px] text-blue-400 font-black uppercase mb-1">سرعة الاستجابة</p>
                   <p className="text-3xl font-black text-white">0.5s</p>
                </div>
-               <div className="bg-brand-gray-dark/80 px-6 py-4 rounded-2xl border border-purple-500/20 text-center min-w-[140px]">
+               <div className="bg-brand-gray-dark/80 px-6 py-4 rounded-2xl border border-purple-500/20 text-center min-w-[140px] shadow-lg">
                   <p className="text-[10px] text-purple-400 font-black uppercase mb-1">دقة الفرز</p>
                   <p className="text-3xl font-black text-white">99%</p>
                </div>
