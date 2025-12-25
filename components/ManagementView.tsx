@@ -4,14 +4,13 @@ import Card from './common/Card';
 import { SettingsContext } from '../contexts/SettingsContext';
 import { BaggageDataContext } from '../contexts/BaggageDataContext';
 import { User, BaggageRecord, WorldTracerConfig, AuditEntry, AuditCategory } from '../types';
-import { SettingsIcon, UserGroupIcon, PhotoIcon, TrashIcon, CheckCircleIcon, WorldIcon, UploadIcon } from './common/icons';
+import { SettingsIcon, UserGroupIcon, PhotoIcon, TrashIcon, CheckCircleIcon, WorldIcon, UploadIcon, BellIcon } from './common/icons';
 import { base64FromFile } from '../utils/imageUtils';
 import BaggageTimer from './common/BaggageTimer';
 import Fuse from 'fuse.js';
 
-type ManagementTab = 'settings' | 'logistics' | 'audit';
+type ManagementTab = 'settings' | 'logistics' | 'audit' | 'security';
 
-// أيقونات إضافية محلية للإجراءات
 const EditIcon: React.FC<{ className?: string }> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -23,6 +22,57 @@ const HistoryIcon: React.FC<{ className?: string }> = ({ className }) => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
     </svg>
 );
+
+const SecurityReportView: React.FC = () => {
+    const settings = useContext(SettingsContext);
+    const securityLogs = useMemo(() => {
+        return (settings?.auditLogs || []).filter(log => log.category === 'Security' && log.action.includes('تسليم'));
+    }, [settings?.auditLogs]);
+
+    return (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="bg-brand-green/10 border border-brand-green/30 p-4 rounded-xl flex items-center justify-between">
+                <div>
+                    <h4 className="text-white font-bold">تقارير التوثيق المزدوج (SGS Security)</h4>
+                    <p className="text-xs text-gray-400">سجل مصادقات الركاب وعمليات التحقق من الهوية الرسمية عند التسليم.</p>
+                </div>
+                <div className="bg-brand-gray-dark px-3 py-1 rounded text-brand-green font-mono text-xs border border-brand-green/20">
+                    إجمالي التقارير: {securityLogs.length}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+                {securityLogs.map(log => (
+                    <Card key={log.id} className="border-brand-green/20 hover:border-brand-green/40 transition-colors">
+                        <div className="flex justify-between items-start">
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 bg-brand-green/10 rounded-lg flex items-center justify-center text-brand-green border border-brand-green/20">
+                                    <CheckCircleIcon className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h5 className="text-white font-bold">{log.action}</h5>
+                                    <p className="text-xs text-gray-300 mt-1">{log.details}</p>
+                                    <div className="flex items-center gap-4 mt-3">
+                                        <span className="text-[10px] text-gray-500 font-mono">المسؤول: {log.user}</span>
+                                        <span className="text-[10px] text-gray-500 font-mono">IP: {log.ip}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-bold bg-brand-gray px-2 py-1 rounded border border-brand-gray-light">
+                                {new Date(log.timestamp).toLocaleString('ar-SA')}
+                            </span>
+                        </div>
+                    </Card>
+                ))}
+                {securityLogs.length === 0 && (
+                    <div className="text-center py-20 bg-brand-gray/30 rounded-xl border border-dashed border-brand-gray-light">
+                        <p className="text-gray-400">لا توجد سجلات تسليم أمني حالياً.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const UserRow: React.FC<{ user: User }> = ({ user }) => {
     const context = useContext(SettingsContext);
@@ -551,6 +601,9 @@ const ManagementView: React.FC = () => {
                 </div>
                 <div className="bg-brand-gray-dark p-1 rounded-xl flex border border-brand-gray-light self-stretch md:self-auto shadow-2xl overflow-x-auto">
                     <button onClick={() => setActiveTab('logistics')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'logistics' ? 'bg-red-500 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>اللوجستيات</button>
+                    <button onClick={() => setActiveTab('security')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'security' ? 'bg-brand-green text-brand-gray-dark shadow-lg' : 'text-gray-400 hover:text-white'}`}>
+                        <CheckCircleIcon className="w-4 h-4" /> التوثيق الأمني
+                    </button>
                     <button onClick={() => setActiveTab('audit')} className={`flex-1 md:flex-none px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 whitespace-nowrap ${activeTab === 'audit' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
                         <HistoryIcon className="w-4 h-4" /> سجل العمليات
                     </button>
@@ -558,6 +611,7 @@ const ManagementView: React.FC = () => {
                 </div>
             </div>
             {activeTab === 'logistics' && <LogisticsView />}
+            {activeTab === 'security' && <SecurityReportView />}
             {activeTab === 'audit' && <AuditLogView />}
             {activeTab === 'settings' && <SettingsView />}
         </div>
