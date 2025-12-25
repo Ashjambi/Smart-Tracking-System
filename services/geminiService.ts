@@ -13,7 +13,7 @@ const cleanJsonResponse = (text: string): string => {
 };
 
 /**
- * الحصول على مفتاح API الحالي
+ * الحصول على مفتاح API الحالي من البيئة أو الذاكرة
  */
 const getApiKey = (): string | undefined => {
     const key = process.env.API_KEY;
@@ -85,11 +85,19 @@ export const getAiChatResponse = async (
 
     try {
         const ai = new GoogleGenAI({ apiKey });
+        
+        // تعليمات صارمة جداً لمنع الهلوسة
         const systemInstruction = `
-        IDENTITY: SGS Strategic Assistant for Saudi Ground Services.
-        LANGUAGE: ${lang === 'ar' ? 'Arabic' : 'English'}.
-        CONTEXT: ${JSON.stringify(baggageContext)}
-        RULES: Be professional, brief, and provide accurate status based ONLY on context.
+        ROLE: SGS Strategic Assistant for Saudi Ground Services.
+        STRICT RULES:
+        1. Respond ONLY based on the provided JSON context. 
+        2. NEVER make up URLs, links, or contact info. 
+        3. Do NOT say a photo exists unless 'baggagePhotoUrl' or 'passengerPhotoUrl' in the context is a valid link (not empty).
+        4. If the user asks for information NOT in the context (like a phone number or specific person), apologize politely and say you don't have that information.
+        5. Keep responses brief (max 25 words), professional, and in ${lang === 'ar' ? 'Arabic' : 'English'}.
+        6. If the context is empty or null, state that you are still searching for the data.
+
+        DATA CONTEXT: ${JSON.stringify(baggageContext)}
         `;
 
         const history = conversation.slice(0, -1).map(m => ({
@@ -105,13 +113,17 @@ export const getAiChatResponse = async (
                 ...history,
                 { role: 'user', parts: [{ text: conversation[conversation.length - 1].text }] }
             ],
-            config: { systemInstruction, temperature: 0.2 }
+            config: { 
+                systemInstruction, 
+                temperature: 0.1, // تقليل العشوائية إلى أدنى حد لمنع التخريف
+                topP: 0.1
+            }
         });
 
-        return response.text || "No response";
+        return response.text || (lang === 'ar' ? "عذراً، لم أتمكن من معالجة الرد حالياً." : "Sorry, I couldn't process the response.");
     } catch (err: any) {
         console.error("Gemini Error:", err);
-        return lang === 'ar' ? `خطأ في الاتصال بالسحابة الذكية: ${err.message}` : `Cloud Connection Error: ${err.message}`;
+        return lang === 'ar' ? `النظام الذكي غير متاح حالياً: ${err.message}` : `Smart system unavailable: ${err.message}`;
     }
 };
 
@@ -127,7 +139,9 @@ export const findPotentialMatchesByDescription = async (
     try {
         const ai = new GoogleGenAI({ apiKey });
         const bagsList = bagsToFilter.map(b => ({ pir: b.PIR, features: b.AiFeatures }));
-        const prompt = `Match description "${description}" from: ${JSON.stringify(bagsList)}. Return ONLY a JSON array of PIR strings.`;
+        const prompt = `Task: Match description "${description}" from this list: ${JSON.stringify(bagsList)}. 
+        Rule: If no strong match, return an empty array []. 
+        Output: ONLY a JSON array of PIR strings.`;
 
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
@@ -159,9 +173,9 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
         model: MODEL_NAME,
         contents: [{ 
             role: 'user',
-            parts: [{ text: "Analyze this baggage. Return JSON with 'name' (if tag visible), 'description', and 'features' object (brand, color, size, type, distinctiveMarks)." }, ...imageParts] 
+            parts: [{ text: "Analyze baggage visually. JSON output only. If passenger name on tag is visible, extract it to 'name'." }, ...imageParts] 
         }],
-        config: { responseMimeType: "application/json", temperature: 0.1 }
+        config: { responseMimeType: "application/json", temperature: 0.0 }
     });
     
     const textResponse = response.text;
@@ -181,12 +195,12 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
             contents: [{ 
                 role: 'user',
                 parts: [
-                    { text: "Strategic Security Comparison: Do these images show the exact same bag? Provide reasoning and a match percentage." },
+                    { text: "Strict Security Verification: Are these two bags the same? Compare visual details only. Start with MATCH: YES or MATCH: NO." },
                     { inlineData: { data: p64.base64, mimeType: p64.mimeType } },
                     { inlineData: { data: s64.base64, mimeType: s64.mimeType } }
                 ] 
             }],
-            config: { temperature: 0 }
+            config: { temperature: 0.0 }
         });
         return response.text || "NO_MATCH";
     } catch { return "MATCH_SERVICE_UNAVAILABLE"; }
@@ -195,7 +209,7 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
 export const getInitialBotMessage = (record: BaggageRecord, lang: 'ar' | 'en' = 'ar'): { chatResponse: string; baggageInfo: BaggageInfo } => {
     const baggageInfo = recordToBaggageInfo(record);
     const chatResponse = lang === 'ar' 
-        ? `تم العثور على سجل الحقيبة الخاصة بكم (${record.PIR}). نظام SGS الذكي تحت تصرفكم لمتابعة التسليم.`
-        : `Baggage record (${record.PIR}) located. SGS Smart System is ready to assist with your delivery.`;
+        ? `نظام SGS الذكي يرحب بكم. تم العثور على سجل الحقيبة (${record.PIR}). كيف يمكنني خدمتك بناءً على هذه البيانات؟`
+        : `SGS Smart System welcomes you. Baggage record (${record.PIR}) located. How can I assist you with this data?`;
     return { chatResponse, baggageInfo };
 };
