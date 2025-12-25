@@ -83,25 +83,35 @@ export const getAiChatResponse = async (
     const apiKey = getApiKey();
     if (!apiKey) throw new Error("API_KEY_MISSING");
 
+    // تحقق برمي صلب من وجود الصورة قبل تمرير السياق للذكاء الاصطناعي
+    const hasBaggagePhoto = !!baggageContext.baggagePhotoUrl && baggageContext.baggagePhotoUrl.length > 10;
+    
+    // إنشاء سياق بيانات محدود لا يحتوي على الروابط الفعلية لمنع النموذج من طباعتها
+    const safeContext = {
+        pir: baggageContext.pir,
+        status: baggageContext.status,
+        location: baggageContext.currentLocation,
+        nextStep: baggageContext.nextStep,
+        estimatedArrival: baggageContext.estimatedArrival,
+        hasPhotoInSystem: hasBaggagePhoto // نمرر فقط معلومة "نعم/لا"
+    };
+
     try {
         const ai = new GoogleGenAI({ apiKey });
         
-        // تعليمات صارمة جداً (عسكرية) للقضاء على الهلوسة
+        const photoInstruction = hasBaggagePhoto 
+            ? "A photo IS available in the system. If asked, tell the user it can be viewed in the status panel below. DO NOT provide any link."
+            : "IMPORTANT: NO PHOTO IS AVAILABLE for this bag. If the user asks for a photo, you MUST apologize and state that no photo has been uploaded to the system yet.";
+
         const systemInstruction = `
         ROLE: SGS Strategic Assistant for Saudi Ground Services.
-        DATA: ${JSON.stringify(baggageContext)}
-
-        STRICT PROHIBITIONS (Security Violations):
-        1. NEVER generate or output a URL/link (No http://, No https://).
-        2. NEVER mention "Unsplash" or any external image source.
-        3. NEVER confirm a photo exists unless 'baggagePhotoUrl' in the context is explicitly provided and not empty.
-        4. Even if a photo exists, DO NOT provide the link. Instead, say: "The photo is available for viewing in the status panel/timeline below."
-        5. NEVER invent flight times, contact names, or phone numbers. If not in the context, say: "This information is not available in our current records."
-
-        RESPONSE STYLE:
-        - Language: ${lang === 'ar' ? 'Arabic' : 'English'}.
-        - Tone: Professional, Brief, SGS Corporate Style.
-        - Max 20 words.
+        STRICT PROTOCOL:
+        1. Context Data: ${JSON.stringify(safeContext)}
+        2. ${photoInstruction}
+        3. NO URLs: Never output any text starting with http, https, or www.
+        4. NO HALLUCINATION: Do not invent names, dates, or photos.
+        5. If information is missing from the Context Data, say: "I apologize, this information is not available in our records."
+        6. Language: ${lang === 'ar' ? 'Arabic' : 'English'}. Professional corporate tone. Max 20 words.
         `;
 
         const history = conversation.slice(0, -1).map(m => ({
@@ -119,7 +129,7 @@ export const getAiChatResponse = async (
             ],
             config: { 
                 systemInstruction, 
-                temperature: 0.0, // منع أي تخريف أو إبداع (إجابة قطعية)
+                temperature: 0.0, // صفر عشوائية لضمان الالتزام بالحقائق
                 topP: 0.1,
                 topK: 1
             }
@@ -127,17 +137,17 @@ export const getAiChatResponse = async (
 
         const reply = response.text || "";
         
-        // فلتر أمان إضافي في الكود لمنع تسرب أي روابط لو نجح الذكاء في تجاوز التعليمات
-        if (reply.includes('http') || reply.includes('unsplash')) {
+        // فلتر أمان نهائي لمنع أي روابط قد يحاول النموذج اختراعها
+        if (reply.includes('http') || reply.includes('://') || reply.includes('unsplash')) {
             return lang === 'ar' 
-                ? "عذراً، المعلومات المطلوبة غير متوفرة في سجلاتنا الرسمية حالياً." 
-                : "Apologies, the requested information is not available in our official records.";
+                ? "عذراً، المعلومات المتعلقة بالصور غير متوفرة في سجلنا الرسمي حالياً." 
+                : "Apologies, photo information is not available in our official records.";
         }
 
         return reply;
     } catch (err: any) {
         console.error("Gemini Critical Error:", err);
-        return lang === 'ar' ? `النظام الذكي تحت الصيانة حالياً.` : `Smart system is under maintenance.`;
+        return lang === 'ar' ? `النظام الذكي غير متاح حالياً.` : `Smart system is currently unavailable.`;
     }
 };
 
@@ -153,7 +163,7 @@ export const findPotentialMatchesByDescription = async (
     try {
         const ai = new GoogleGenAI({ apiKey });
         const bagsList = bagsToFilter.map(b => ({ pir: b.PIR, features: b.AiFeatures }));
-        const prompt = `Match description "${description}" from this list: ${JSON.stringify(bagsList)}. Return ONLY a JSON array of PIR strings. Empty [] if no match.`;
+        const prompt = `Match description "${description}" from this list: ${JSON.stringify(bagsList)}. Return ONLY a JSON array of PIR strings.`;
 
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
@@ -185,7 +195,7 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
         model: MODEL_NAME,
         contents: [{ 
             role: 'user',
-            parts: [{ text: "Analyze baggage visually. JSON output only. Extract passenger name from tags if visible." }, ...imageParts] 
+            parts: [{ text: "Analyze baggage visually. JSON output only." }, ...imageParts] 
         }],
         config: { responseMimeType: "application/json", temperature: 0.0 }
     });
@@ -207,7 +217,7 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
             contents: [{ 
                 role: 'user',
                 parts: [
-                    { text: "Security Analysis: Same bag? Answer strictly YES or NO followed by reasoning." },
+                    { text: "Security Analysis: Same bag? Strictly YES or NO." },
                     { inlineData: { data: p64.base64, mimeType: p64.mimeType } },
                     { inlineData: { data: s64.base64, mimeType: s64.mimeType } }
                 ] 
@@ -221,7 +231,7 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
 export const getInitialBotMessage = (record: BaggageRecord, lang: 'ar' | 'en' = 'ar'): { chatResponse: string; baggageInfo: BaggageInfo } => {
     const baggageInfo = recordToBaggageInfo(record);
     const chatResponse = lang === 'ar' 
-        ? `أهلاً بك. تم العثور على بيانات حقيبتك (${record.PIR}). كيف يمكن لمساعد SGS الذكي خدمتك اليوم؟`
-        : `Welcome. Your baggage data (${record.PIR}) has been found. How can the SGS Smart Assistant help you today?`;
+        ? `تم العثور على سجل الحقيبة (${record.PIR}). كيف يمكنني مساعدتك في تتبعها؟`
+        : `Baggage record (${record.PIR}) found. How can I assist you with tracking?`;
     return { chatResponse, baggageInfo };
 };
