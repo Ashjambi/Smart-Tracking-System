@@ -1,7 +1,9 @@
-import React, { useContext } from 'react';
+
+import React, { useContext, useEffect, useState } from 'react';
 import { View } from '../types';
 import { VIEW } from '../constants';
 import { SettingsContext } from '../contexts/SettingsContext';
+import { isAiReady } from '../services/geminiService';
 
 interface HeaderProps {
   setCurrentView: (view: View) => void;
@@ -9,7 +11,18 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ setCurrentView }) => {
   const settingsContext = useContext(SettingsContext);
+  const [aiStatus, setAiStatus] = useState<'connected' | 'checking'>('checking');
   const logoUrl = settingsContext?.logoUrl;
+
+  useEffect(() => {
+      const check = async () => {
+          const ready = await isAiReady();
+          setAiStatus(ready ? 'connected' : 'checking');
+      };
+      check();
+      const interval = setInterval(check, 10000); // Re-check periodically
+      return () => clearInterval(interval);
+  }, []);
 
   return (
     <header className="bg-brand-dark/95 backdrop-blur-xl text-white sticky top-0 z-50 border-b border-brand-green/10 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
@@ -28,7 +41,7 @@ const Header: React.FC<HeaderProps> = ({ setCurrentView }) => {
                         <span className="text-brand-dark font-black text-2xl">SGS</span>
                     </div>
                 )}
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-brand-green rounded-full border-4 border-brand-dark animate-pulse shadow-[0_0_10px_rgba(52,211,153,1)]"></div>
+                <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-4 border-brand-dark shadow-[0_0_10px_rgba(52,211,153,1)] ${aiStatus === 'connected' ? 'bg-brand-green animate-pulse' : 'bg-yellow-500 animate-bounce'}`}></div>
             </div>
             <div className="hidden sm:block">
                 <h1 className="text-2xl font-black text-white tracking-tight leading-none">تتبع الأمتعة الذكي</h1>
@@ -40,8 +53,10 @@ const Header: React.FC<HeaderProps> = ({ setCurrentView }) => {
               <div className="hidden lg:flex flex-col items-end border-r border-white/10 pr-6 mr-6">
                   <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest">Operational Status</span>
                   <div className="flex items-center gap-2 mt-1">
-                      <span className="w-2 h-2 bg-brand-green rounded-full animate-pulse"></span>
-                      <span className="text-xs text-brand-green font-bold">Secure Connection Active</span>
+                      <span className={`w-2 h-2 rounded-full ${aiStatus === 'connected' ? 'bg-brand-green animate-pulse' : 'bg-yellow-500'}`}></span>
+                      <span className={`text-xs font-bold ${aiStatus === 'connected' ? 'text-brand-green' : 'text-yellow-500'}`}>
+                          {aiStatus === 'connected' ? 'Secure AI Engine Active' : 'Waiting for AI Link'}
+                      </span>
                   </div>
               </div>
               

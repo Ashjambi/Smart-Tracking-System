@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { BaggageInfo, BaggageRecord, DataSourceMode, Message, MessageSender, AiFeatures } from '../types';
 import { recordToBaggageInfo } from '../utils/baggageUtils';
 import { findBaggageByQuery as findInWorldTracer } from './worldTracerService';
@@ -11,28 +11,30 @@ const cleanJsonResponse = (text: string): string => {
 };
 
 /**
- * الوصول الآمن والذكي لمفتاح API
- * يتحقق من الحقن أثناء البناء أو الوجود في البيئة العالمية
+ * الحصول على مفتاح API الحالي
+ * الأولوية لـ process.env.API_KEY المحقون أو المختار ديناميكياً
  */
 const getApiKey = (): string | undefined => {
-    try {
-        // الوصول المباشر المحقون بواسطة Bun Build
-        const key = process.env.API_KEY;
-        
-        // التحقق من أن المفتاح ليس فارغاً وليس مجرد نص المتغير المرجعي
-        if (key && key !== 'undefined' && key !== 'null' && key !== '' && key !== '${API_KEY}' && key.length > 5) {
-            return key;
-        }
-        
-        // محاولة الوصول عبر كائن window في حال فشل الحقن المباشر
-        const globalKey = (window as any).process?.env?.API_KEY;
-        if (globalKey && globalKey !== 'undefined' && globalKey.length > 5) {
-            return globalKey;
-        }
-    } catch (e) {
-        console.error("Strategic System Alert: Process environment inaccessible.");
+    const key = process.env.API_KEY;
+    if (key && key !== 'undefined' && key !== 'null' && key.length > 5) {
+        return key;
     }
     return undefined;
+};
+
+/**
+ * التحقق من جاهزية النظام الذكي
+ */
+export const isAiReady = async (): Promise<boolean> => {
+    const key = getApiKey();
+    if (key) return true;
+    
+    // فحص واجهة aistudio إذا كانت متاحة
+    if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
+        return await (window as any).aistudio.hasSelectedApiKey();
+    }
+    
+    return false;
 };
 
 export const findBaggageRecord = async (
@@ -79,12 +81,7 @@ export const getAiChatResponse = async (
     lang: 'ar' | 'en' = 'ar'
 ): Promise<string> => {
     const apiKey = getApiKey();
-    
-    if (!apiKey) {
-        return lang === 'ar' 
-            ? "⚠️ تنبيه إداري: نظام الذكاء الاصطناعي في وضع السكون. يرجى التأكد من إضافة API_KEY في إعدادات Cloudflare (Production Environment) وإعادة بناء المشروع." 
-            : "⚠️ Strategic Notice: AI System is in standby. Ensure API_KEY is configured in Cloudflare Production settings and rebuild.";
-    }
+    if (!apiKey) throw new Error("API_KEY_MISSING");
 
     try {
         const ai = new GoogleGenAI({ apiKey });
@@ -111,8 +108,8 @@ export const getAiChatResponse = async (
         const response = await chat.sendMessage({ message: conversation[conversation.length - 1].text });
         return response.text || "No response";
     } catch (err: any) {
-        console.error("Gemini Connection Failure:", err);
-        return lang === 'ar' ? `خطأ في الاتصال بالخدمات الذكية: ${err.message}` : `Smart Services Error: ${err.message}`;
+        console.error("Gemini Error:", err);
+        return lang === 'ar' ? `خطأ في الاتصال بالسحابة الذكية: ${err.message}` : `Cloud Connection Error: ${err.message}`;
     }
 };
 
@@ -160,7 +157,7 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
         model: 'gemini-3-flash-preview',
         contents: [{ 
             role: 'user',
-            parts: [{ text: "Analyze baggage and return JSON structure." }, ...imageParts] 
+            parts: [{ text: "Analyze baggage and return JSON structure with name, description, and features." }, ...imageParts] 
         }],
         config: { responseMimeType: "application/json", temperature: 0.1 }
     });
@@ -168,14 +165,6 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
     const textResponse = response.text;
     if (!textResponse) throw new Error("Empty response");
     return JSON.parse(cleanJsonResponse(textResponse));
-};
-
-export const getInitialBotMessage = (record: BaggageRecord, lang: 'ar' | 'en' = 'ar'): { chatResponse: string; baggageInfo: BaggageInfo } => {
-    const baggageInfo = recordToBaggageInfo(record);
-    const chatResponse = lang === 'ar' 
-        ? `تم تحديد سجل الحقيبة (${record.PIR}). كيف يمكنني مساعدتكم بخصوص هذه الرحلة؟`
-        : `Baggage record (${record.PIR}) located. How can I assist you further?`;
-    return { chatResponse, baggageInfo };
 };
 
 export const compareBaggageImages = async (pImg: string, sImg: string) => {
@@ -199,4 +188,12 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
         });
         return response.text || "NO_MATCH";
     } catch { return "MATCH_SERVICE_UNAVAILABLE"; }
+};
+
+export const getInitialBotMessage = (record: BaggageRecord, lang: 'ar' | 'en' = 'ar'): { chatResponse: string; baggageInfo: BaggageInfo } => {
+    const baggageInfo = recordToBaggageInfo(record);
+    const chatResponse = lang === 'ar' 
+        ? `تم تحديد سجل الحقيبة (${record.PIR}). كيف يمكنني مساعدتكم بخصوص هذه الرحلة؟`
+        : `Baggage record (${record.PIR}) located. How can I assist you further?`;
+    return { chatResponse, baggageInfo };
 };

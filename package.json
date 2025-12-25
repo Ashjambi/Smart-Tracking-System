@@ -4,6 +4,6 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "rm -rf dist && mkdir -p dist && bun build ./index.tsx --outfile ./dist/index.js --target browser --format esm --define \"process.env.API_KEY='${API_KEY}'\" --external react --external react-dom --external @google/genai --external fuse.js && cp index.html metadata.json _redirects dist/ && sed -i 's|src=\"/index.tsx\"|src=\"/index.js\"|g' dist/index.html"
+    "build": "rm -rf dist && mkdir -p dist && bun build ./index.tsx --outfile ./dist/index.js --target browser --format esm --define process.env.API_KEY=\"$API_KEY\" --external react --external react-dom --external @google/genai --external fuse.js && cp index.html metadata.json _redirects dist/ && sed -i 's|src=\"/index.tsx\"|src=\"/index.js\"|g' dist/index.html"
   }
 }
