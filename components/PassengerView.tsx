@@ -295,7 +295,7 @@ const PassengerView: React.FC = () => {
                 setDisplayMatches([]); 
              }
          } catch (e) {
-             console.error(e);
+             console.error("Identification failed:", e);
          } finally {
              setIsTyping(false);
          }
@@ -329,10 +329,12 @@ const PassengerView: React.FC = () => {
                  setMessages(prev => [...prev, { id: Date.now() + 1, text: t.promptIdentify, sender: MessageSender.BOT }]);
             }
         } catch (err) {
-            console.error("Chat flow failed:", err);
-            setMessages(prev => [...prev, { id: Date.now() + 1, text: t.apiError, sender: MessageSender.BOT }]);
+            console.error("AI Assistant Communication Error:", err);
+            // إضافة رسالة خطأ تقنية لمساعدة المطور في الكونسول
+            const errorMsg = (err instanceof Error) ? err.message : "Unknown error";
+            setMessages(prev => [...prev, { id: Date.now() + 1, text: `${t.apiError} (${errorMsg})`, sender: MessageSender.BOT }]);
         } finally {
-            setIsTyping(false); // ضمان إغلاق مؤشر التحميل دائماً
+            setIsTyping(false);
         }
     };
 
