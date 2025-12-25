@@ -9,11 +9,13 @@
     
     <!-- Global Process Polyfill - Must be first -->
     <script>
-      window.process = {
-        env: {
-          API_KEY: undefined
-        }
-      };
+      // تأمين وجود كائن process لمنع الأخطاء في المتصفح
+      window.process = window.process || {};
+      window.process.env = window.process.env || {};
+      // سيتم محاولة استبدال القيمة أدناه أثناء البناء إذا تم ضبط الإعدادات بشكل صحيح
+      if (!window.process.env.API_KEY) {
+        window.process.env.API_KEY = undefined;
+      }
     </script>
 
     <!-- Fonts -->
