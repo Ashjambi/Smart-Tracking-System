@@ -53,56 +53,59 @@ export const getAiChatResponse = async (
     baggageContext: BaggageInfo,
     lang: 'ar' | 'en' = 'ar'
 ): Promise<string> => {
-    // التأكد من وجود مفتاح API قبل المحاولة لتجنب التعليق غير المبرر
     if (!process.env.API_KEY) {
-        return lang === 'ar' ? "خطأ في تكوين الخادم: مفتاح API مفقود." : "Server Configuration Error: API Key missing.";
+        return lang === 'ar' ? "خطأ: مفتاح API غير متوفر." : "Error: API Key not available.";
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // الانتقال إلى نموذج Flash لسرعة الاستجابة في البيئات السحابية
-    const model = 'gemini-3-flash-preview';
+    const modelName = 'gemini-3-flash-preview';
     
-    const hasFront = !!baggageContext.baggagePhotoUrl && baggageContext.baggagePhotoUrl.startsWith('http');
-    const hasBack = !!baggageContext.baggagePhotoUrl_2 && baggageContext.baggagePhotoUrl_2.startsWith('http');
-    const totalPhotos = (hasFront ? 1 : 0) + (hasBack ? 1 : 0);
+    // دمج الرسائل المتتالية من نفس الدور لضمان تعاقب الأدوار (User/Model)
+    const formattedContents: any[] = [];
+    conversation.forEach((msg) => {
+        const role = msg.sender === MessageSender.USER ? 'user' : 'model';
+        if (formattedContents.length > 0 && formattedContents[formattedContents.length - 1].role === role) {
+            formattedContents[formattedContents.length - 1].parts[0].text += `\n${msg.text}`;
+        } else {
+            formattedContents.push({
+                role,
+                parts: [{ text: msg.text }]
+            });
+        }
+    });
+
+    // التأكد من أن المحادثة تبدأ دائماً من المستخدم
+    if (formattedContents.length > 0 && formattedContents[0].role === 'model') {
+        formattedContents.shift();
+    }
 
     const systemInstruction = `
-    IDENTITY: You are the SGS Smart Auditor for Saudi Ground Services. 
-    DATA SOURCE: ${JSON.stringify(baggageContext)}
-    
-    PHOTO_AVAILABILITY:
-    - Front: ${hasFront ? 'YES' : 'NO'}
-    - Back: ${hasBack ? 'YES' : 'NO'}
-    - Total: ${totalPhotos}
+    IDENTITY: You are the SGS Smart Auditor for Saudi Ground Services.
+    LANGUAGE: Respond in ${lang === 'ar' ? 'Arabic' : 'English'}.
+    CONTEXT: ${JSON.stringify(baggageContext)}
     
     RULES:
-    1. Only provide info found in DATA SOURCE.
-    2. If asked about photos and Total=0, say none are available.
-    3. Keep responses extremely concise (max 20 words).
-    4. Never mention internal IDs or URLs.
+    1. Only provide info found in the CONTEXT.
+    2. Keep responses very brief (max 30 words).
+    3. If status is "Delivered", congratulate the passenger.
+    4. Never reveal system internal IDs or URLs.
     `;
-
-    const contents = conversation.map(m => ({
-        role: m.sender === MessageSender.USER ? 'user' : 'model',
-        parts: [{ text: m.text }]
-    }));
 
     try {
         const response = await ai.models.generateContent({ 
-            model, 
-            contents, 
+            model: modelName, 
+            contents: formattedContents, 
             config: { 
                 systemInstruction,
-                temperature: 0.1,
-                // تعطيل التفكير العميق (Thinking) لضمان سرعة الرد اللحظية وتجنب التوقف
-                thinkingConfig: { thinkingBudget: 0 } 
+                temperature: 0.2,
+                thinkingConfig: { thinkingBudget: 0 } // تعطيل التفكير لسرعة الاستجابة في Cloudflare
             } 
         });
         
-        return response.text || (lang === 'ar' ? "لا توجد بيانات متاحة حالياً." : "No data available at the moment.");
+        return response.text || (lang === 'ar' ? "لم أستطع الحصول على إجابة، يرجى المحاولة مرة أخرى." : "Could not get an answer, please try again.");
     } catch (err) {
-        console.error("Chat API Error:", err);
-        return lang === 'ar' ? "نواجه ضغطاً في الطلبات حالياً، يرجى المحاولة بعد قليل." : "We are experiencing high traffic, please try again shortly.";
+        console.error("Gemini API Error:", err);
+        throw err;
     }
 };
 
@@ -115,15 +118,18 @@ export const findPotentialMatchesByDescription = async (
     if (bagsToFilter.length === 0 || !process.env.API_KEY) return [];
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const model = 'gemini-3-flash-preview';
     const bagsList = bagsToFilter.map(b => ({ pir: b.PIR, features: b.AiFeatures }));
     const prompt = `Match description "${description}" against: ${JSON.stringify(bagsList)}. Return ONLY a JSON array of matching PIRs.`;
 
     try {
         const response = await ai.models.generateContent({
-            model,
+            model: 'gemini-3-flash-preview',
             contents: [{ parts: [{ text: prompt }] }],
-            config: { responseMimeType: "application/json", temperature: 0.0 }
+            config: { 
+                responseMimeType: "application/json", 
+                temperature: 0.0,
+                thinkingConfig: { thinkingBudget: 0 }
+            }
         });
         const textResponse = response.text;
         if (!textResponse) return [];
@@ -140,7 +146,6 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
     if (!process.env.API_KEY) throw new Error("API Key missing");
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const model = 'gemini-3-flash-preview'; 
     try {
         const imageParts = await Promise.all(imageUrls.map(async (url) => {
             const { base64, mimeType } = await imageToBase64(url);
@@ -148,14 +153,18 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
         }));
 
         const response = await ai.models.generateContent({
-            model,
+            model: 'gemini-3-flash-preview',
             contents: [{ 
                 parts: [
                     { text: "Analyze baggage for SGS. Return JSON: { \"name\": \"string\", \"description\": \"string\", \"features\": { \"brand\": \"string\", \"color\": \"string\", \"size\": \"Small|Medium|Large|Extra Large\", \"type\": \"string\", \"distinctiveMarks\": \"string\" } }" }, 
                     ...imageParts
                 ] 
             }],
-            config: { responseMimeType: "application/json", temperature: 0.1 }
+            config: { 
+                responseMimeType: "application/json", 
+                temperature: 0.1,
+                thinkingConfig: { thinkingBudget: 0 }
+            }
         });
         
         const textResponse = response.text;
@@ -179,18 +188,18 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
     if (!process.env.API_KEY) return "ERROR: API KEY MISSING";
     
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const model = 'gemini-3-flash-preview';
     try {
         const [p64, s64] = await Promise.all([imageToBase64(pImg), imageToBase64(sImg)]);
         const response = await ai.models.generateContent({
-            model,
+            model: 'gemini-3-flash-preview',
             contents: [{ 
                 parts: [
                     { text: "Compare 2 bags. Is it a match? Return MATCH or NO_MATCH + reason." },
                     { inlineData: { data: p64.base64, mimeType: p64.mimeType } },
                     { inlineData: { data: s64.base64, mimeType: s64.mimeType } }
                 ] 
-            }]
+            }],
+            config: { thinkingConfig: { thinkingBudget: 0 } }
         });
         return response.text || "NO_MATCH";
     } catch { return "MATCH_SERVICE_UNAVAILABLE"; }

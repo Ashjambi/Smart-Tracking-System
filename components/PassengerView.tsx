@@ -53,7 +53,8 @@ const translations = {
         statusUpdate: "تحديث في حالة الأمتعة",
         statusUpdateMsg: "تغيرت حالة حقيبتك ({id}) إلى: {status}",
         deliveredTitle: "تم التسليم بنجاح!",
-        deliveredMsg: "تم استلام حقيبتك رسمياً. نشكركم لاختيار خدماتنا."
+        deliveredMsg: "تم استلام حقيبتك رسمياً. نشكركم لاختيار خدماتنا.",
+        apiError: "نواجه مشكلة في الاتصال بالمساعد الذكي حالياً. يرجى المحاولة بعد قليل."
     },
     en: {
         welcome: "Smart Tracking System - SGS",
@@ -93,7 +94,8 @@ const translations = {
         statusUpdate: "Baggage Status Update",
         statusUpdateMsg: "Your baggage ({id}) status changed to: {status}",
         deliveredTitle: "Delivered Successfully!",
-        deliveredMsg: "Your bag has been officially delivered. Thank you for choosing our services."
+        deliveredMsg: "Your bag has been officially delivered. Thank you for choosing our services.",
+        apiError: "We are having trouble connecting to the assistant. Please try again later."
     }
 };
 
@@ -276,49 +278,62 @@ const PassengerView: React.FC = () => {
          if (!dataContext) return;
          setIsAuthenticated(true);
          setIsTyping(true);
-         let { record, error } = await findBaggageRecord(id, type, dataContext.dataSource, dataContext.baggageData);
-         const foundBags = (dataContext.baggageData || []).filter(r => r.Status === 'Found - Awaiting Claim');
-         setAllFoundBags(foundBags);
-         if (!record) {
-            setDisplayMatches(foundBags);
-            const displayId = id.includes('|') ? id.split('|')[0] : id;
-            const welcomeMsg: Message = { id: Date.now(), text: t.botError.replace('{id}', displayId), sender: MessageSender.BOT };
-            setMessages([welcomeMsg]);
-         } else {
-            setAuthPir(record.PIR);
-            const { chatResponse, baggageInfo: info } = getInitialBotMessage(record, lang);
-            setBaggageInfo(info);
-            setMessages([{ id: 1, text: chatResponse, sender: MessageSender.BOT }]);
-            setDisplayMatches([]); 
+         try {
+             let { record, error } = await findBaggageRecord(id, type, dataContext.dataSource, dataContext.baggageData);
+             const foundBags = (dataContext.baggageData || []).filter(r => r.Status === 'Found - Awaiting Claim');
+             setAllFoundBags(foundBags);
+             if (!record) {
+                setDisplayMatches(foundBags);
+                const displayId = id.includes('|') ? id.split('|')[0] : id;
+                const welcomeMsg: Message = { id: Date.now(), text: t.botError.replace('{id}', displayId), sender: MessageSender.BOT };
+                setMessages([welcomeMsg]);
+             } else {
+                setAuthPir(record.PIR);
+                const { chatResponse, baggageInfo: info } = getInitialBotMessage(record, lang);
+                setBaggageInfo(info);
+                setMessages([{ id: 1, text: chatResponse, sender: MessageSender.BOT }]);
+                setDisplayMatches([]); 
+             }
+         } catch (e) {
+             console.error(e);
+         } finally {
+             setIsTyping(false);
          }
-         setIsTyping(false);
     };
 
     const handleSendMessage = async (text: string) => {
+        if (!text.trim()) return;
         const newUserMsg: Message = { id: Date.now(), text, sender: MessageSender.USER };
         setMessages(prev => [...prev, newUserMsg]);
         setIsTyping(true);
-        if (!baggageInfo && allFoundBags.length > 0) {
-            setIsFiltering(true);
-            setLastFilterQuery(text);
-            const matches = await findPotentialMatchesByDescription(text, allFoundBags, undefined, lang);
-            let responseText = "";
-            if (matches.length > 0) {
-                setDisplayMatches(matches);
-                responseText = t.filterBot.replace('{count}', matches.length.toString()).replace('{text}', text);
+        
+        try {
+            if (!baggageInfo && allFoundBags.length > 0) {
+                setIsFiltering(true);
+                setLastFilterQuery(text);
+                const matches = await findPotentialMatchesByDescription(text, allFoundBags, undefined, lang);
+                let responseText = "";
+                if (matches.length > 0) {
+                    setDisplayMatches(matches);
+                    responseText = t.filterBot.replace('{count}', matches.length.toString()).replace('{text}', text);
+                } else {
+                    setDisplayMatches(allFoundBags); 
+                    responseText = t.filterNoMatch.replace('{text}', text);
+                }
+                setMessages(prev => [...prev, { id: Date.now() + 1, text: responseText, sender: MessageSender.BOT }]);
+                setIsFiltering(false);
+            } else if (baggageInfo) {
+                const response = await getAiChatResponse([...messages, newUserMsg], baggageInfo, lang);
+                setMessages(prev => [...prev, { id: Date.now() + 1, text: response, sender: MessageSender.BOT }]);
             } else {
-                setDisplayMatches(allFoundBags); 
-                responseText = t.filterNoMatch.replace('{text}', text);
+                 setMessages(prev => [...prev, { id: Date.now() + 1, text: t.promptIdentify, sender: MessageSender.BOT }]);
             }
-            setMessages(prev => [...prev, { id: Date.now() + 1, text: responseText, sender: MessageSender.BOT }]);
-            setIsFiltering(false);
-        } else if (baggageInfo) {
-            const response = await getAiChatResponse([...messages, newUserMsg], baggageInfo, lang);
-            setMessages(prev => [...prev, { id: Date.now() + 1, text: response, sender: MessageSender.BOT }]);
-        } else {
-             setMessages(prev => [...prev, { id: Date.now() + 1, text: t.promptIdentify, sender: MessageSender.BOT }]);
+        } catch (err) {
+            console.error("Chat flow failed:", err);
+            setMessages(prev => [...prev, { id: Date.now() + 1, text: t.apiError, sender: MessageSender.BOT }]);
+        } finally {
+            setIsTyping(false); // ضمان إغلاق مؤشر التحميل دائماً
         }
-        setIsTyping(false);
     };
 
     const handleSelectMatch = useCallback((record: BaggageRecord) => {
