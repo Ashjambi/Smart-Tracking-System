@@ -30,28 +30,48 @@ export const BaggageDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     };
 
     /**
-     * تحديث سجل في قاعدة البيانات مع ضمان المزامنة اللحظية (Reactive Update)
+     * تحديث سجل في قاعدة البيانات مع ضمان المزامنة اللحظية الشاملة لبروتوكول "التسليم الأمني"
      */
     const updateBaggageRecord = useCallback(async (pir: string, updates: Partial<BaggageRecord>) => {
         const searchPir = pir.trim().toUpperCase();
         const now = updates.LastUpdate || new Date().toISOString();
         
-        // 1. تحديث قاعدة بيانات الـ Excel المحملة (للمزامنة الداخلية)
+        // 1. تحديث قاعدة بيانات الـ Local (Excel/Memory)
         setBaggageData(currentData => {
             if (!currentData) return null;
+            const exists = currentData.some(r => r.PIR.toUpperCase() === searchPir);
+            
+            // إضافة السجل إذا لم يكن موجوداً محلياً (سجل قادم من Tracer)
+            if (!exists && updates.PIR) {
+                return [{ ...updates, PIR: searchPir, LastUpdate: now } as BaggageRecord, ...currentData];
+            }
+            
             return currentData.map(record => {
-                if (record.PIR.trim().toUpperCase() === searchPir) {
+                if (record.PIR.toUpperCase() === searchPir) {
                     return { ...record, ...updates, LastUpdate: now };
                 }
                 return record;
             });
         });
 
-        // 2. تحديث قائمة التقارير (wtReports) التي يعتمد عليها StaffView لرسم البطاقات
-        // هذا يضمن أن البطاقة ستتغير حالتها فور إغلاق النافذة المنبثقة أو حتى قبلها
+        // 2. تحديث قائمة التقارير (wtReports) لضمان الاستجابة الفورية لواجهة الموظفين
         setWtReports(currentReports => {
-            const updatedReports = currentReports.map(report => {
-                if (report.pir.trim().toUpperCase() === searchPir) {
+            const index = currentReports.findIndex(r => r.pir.toUpperCase() === searchPir);
+            
+            if (index === -1) {
+                const newReport: BaggageReport = {
+                    id: searchPir,
+                    passengerName: (updates as any).PassengerName || 'Unknown',
+                    flight: (updates as any).Flight || 'N/A',
+                    pir: searchPir,
+                    status: (updates.Status as any) || 'In Progress',
+                    lastUpdate: new Date(now)
+                };
+                return [newReport, ...currentReports];
+            }
+            
+            return currentReports.map(report => {
+                if (report.pir.toUpperCase() === searchPir) {
                     return {
                         ...report,
                         status: (updates.Status as any) || report.status,
@@ -60,23 +80,21 @@ export const BaggageDataProvider: React.FC<{ children: ReactNode }> = ({ childre
                 }
                 return report;
             });
-            // العودة بنسخة جديدة لضمان تفاعل React
-            return [...updatedReports];
         });
 
-        // 3. تحديث السجل في الخادم العالمي إذا كان النمط نشطاً
-        if (dataSource === DATA_SOURCE_MODE.WORLDTRACER) {
+        // 3. المزامنة الإجبارية مع النظام العالمي WorldTracer عند التسليم أو تفعيل النمط
+        if (dataSource === DATA_SOURCE_MODE.WORLDTRACER || updates.Status === 'Delivered') {
             try {
                 await updateGlobalRecord(searchPir, { ...updates, LastUpdate: now });
+                console.info(`[STRATEGIC-SYNC] Record ${searchPir} synchronized successfully with global node.`);
             } catch (error) {
-                console.error("[WT-ERROR] Failed to update global record:", error);
+                console.error("[WT-SYNC-ERROR] Critical sync failure:", error);
             }
         }
     }, [dataSource]);
 
     const addBaggageRecord = useCallback((record: BaggageRecord) => {
         const formattedRecord = { ...record, PIR: record.PIR.toUpperCase() };
-        
         setBaggageData(currentData => [formattedRecord, ...(currentData || [])]);
         
         const newReport: BaggageReport = {
