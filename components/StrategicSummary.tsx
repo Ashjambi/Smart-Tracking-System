@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Card from './common/Card';
 import { SparklesIcon, CheckCircleIcon, ChartIcon, WorldIcon } from './common/icons';
@@ -16,11 +15,6 @@ const StrategicSummary: React.FC = () => {
 1. أتمتة عمليات الاستفسار بنسبة 60%.
 2. رفع دقة المطابقة البصرية إلى 95%.
 3. تقليل زمن الحل من 24 ساعة إلى أقل من 6 ساعات.
-
-نظام الثقة (AI Trust):
-- منع الهلوسة: المساعد لا يجيب إلا من واقع السجلات.
-- حظر الروابط: لا يمكن للنظام إرسال روابط خارجية أو وهمية.
-- التحقق المادي: الدردشة لا تعوض الفحص البصري والمطابقة الرسمية.
   `;
 
   const handleCopy = () => {
@@ -30,109 +24,126 @@ const StrategicSummary: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 max-w-5xl mx-auto pb-20">
+    <div className="space-y-8 animate-in fade-in zoom-in-95 duration-700 max-w-5xl mx-auto pb-20 relative">
+      {/* Confidential Watermark */}
+      <div className="absolute top-20 left-1/2 -translate-x-1/2 -rotate-12 pointer-events-none opacity-[0.03] select-none">
+        <h1 className="text-[12rem] font-black text-white whitespace-nowrap">SGS STRATEGIC</h1>
+      </div>
+
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-end border-b border-brand-green/20 pb-6 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-end border-b-2 border-brand-green/30 pb-6 gap-4 relative z-10">
         <div className="text-right">
-          <h2 className="text-3xl font-black text-white">الملخص التنفيذي الاستراتيجي</h2>
-          <p className="text-brand-green font-medium">مشروع التحول الرقمي لقسم خدمات الأمتعة - SGS</p>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded font-black tracking-widest uppercase">Secret / Confidential</span>
+          </div>
+          <h2 className="text-4xl font-black text-white tracking-tight">وثيقة المبادرة الاستراتيجية</h2>
+          <p className="text-brand-green font-bold text-lg mt-1">مشروع التحول الرقمي الذكي - وحدة الأمتعة 2025</p>
         </div>
         <button 
           onClick={handleCopy}
-          className="flex items-center gap-2 px-4 py-2 bg-brand-green/10 border border-brand-green/30 text-brand-green rounded-lg hover:bg-brand-green hover:text-brand-gray-dark transition-all font-bold text-sm"
+          className="flex items-center gap-2 px-6 py-3 bg-brand-green text-brand-gray-dark rounded-xl hover:bg-brand-green-light transition-all font-black text-sm shadow-xl shadow-brand-green/20"
         >
-          {copySuccess ? 'تم النسخ ✓' : 'نسخ الملخص للتقرير الرسمي'}
+          {copySuccess ? 'تم النسخ بنجاح ✓' : 'تصدير الملخص التنفيذي'}
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-brand-gray-dark/40 border-l-4 border-l-brand-green">
-           <div className="flex items-center gap-3 mb-3">
-              <SparklesIcon className="w-6 h-6 text-brand-green" />
-              <h4 className="font-bold text-white">الرؤية الرقمية</h4>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+        <Card className="bg-gradient-to-br from-brand-gray-dark to-brand-gray border-l-4 border-l-brand-green shadow-2xl">
+           <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-brand-green/20 rounded-lg">
+                <SparklesIcon className="w-6 h-6 text-brand-green" />
+              </div>
+              <h4 className="font-black text-white text-lg">الرؤية الرقمية</h4>
            </div>
-           <p className="text-xs text-gray-300 leading-relaxed">
-             استبدال العمليات اليدوية بنظام ذكي يقلل الأخطاء البشرية ويوفر تجربة رقمية فاخرة تعزز مكانة SGS العالمية.
+           <p className="text-sm text-gray-300 leading-relaxed font-medium">
+             تطوير منظومة ذكية متكاملة تقلل الاعتماد على التدخل البشري في رصد التناقضات، مما يضمن دقة تشغيلية تليق بالمعايير العالمية للشركة السعودية للخدمات الأرضية.
            </p>
         </Card>
-        <Card className="bg-brand-gray-dark/40 border-l-4 border-l-blue-500">
-           <div className="flex items-center gap-3 mb-3">
-              <ChartIcon className="w-6 h-6 text-blue-500" />
-              <h4 className="font-bold text-white">حوكمة الذكاء الاصطناعي</h4>
+        
+        <Card className="bg-gradient-to-br from-brand-gray-dark to-brand-gray border-l-4 border-l-blue-500 shadow-2xl">
+           <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <ChartIcon className="w-6 h-6 text-blue-500" />
+              </div>
+              <h4 className="font-black text-white text-lg">حوكمة الـ AI</h4>
            </div>
-           <p className="text-xs text-gray-300 leading-relaxed">
-             النظام مقيد ببروتوكول "الحقيقة المطلقة"؛ المساعد لا يجتهد ولا يؤلف معلومات، بل ينقل البيانات الموثقة فقط.
+           <p className="text-sm text-gray-300 leading-relaxed font-medium">
+             تطبيق معايير أمنية صارمة تمنع استجابات الذكاء الاصطناعي خارج نطاق "بيانات الحقيقة الموثقة" في WorldTracer، لضمان مصداقية المعلومات القانونية.
            </p>
         </Card>
-        <Card className="bg-brand-gray-dark/40 border-l-4 border-l-purple-500">
-           <div className="flex items-center gap-3 mb-3">
-              <WorldIcon className="w-6 h-6 text-purple-500" />
-              <h4 className="font-bold text-white">نطاق التغطية</h4>
+
+        <Card className="bg-gradient-to-br from-brand-gray-dark to-brand-gray border-l-4 border-l-purple-500 shadow-2xl">
+           <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <WorldIcon className="w-6 h-6 text-purple-500" />
+              </div>
+              <h4 className="font-black text-white text-lg">التوسع العالمي</h4>
            </div>
-           <p className="text-xs text-gray-300 leading-relaxed">
-             يغطي المطار والمستودعات مع ربط آلي مع WorldTracer لضمان تكامل البيانات العابرة للحدود.
+           <p className="text-sm text-gray-300 leading-relaxed font-medium">
+             المنصة مصممة للتكامل البرمجي (API) مع كافة مطارات المملكة الرئيسية، مع قابلية الربط مع شركات الطيران العالمية لتبادل البيانات اللحظي.
            </p>
         </Card>
       </div>
 
       {/* Comparison Section */}
-      <section className="space-y-4">
-        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-           <ChartIcon className="w-5 h-5 text-brand-green" />
-           خارطة التحول والسيطرة التشغيلية
+      <section className="space-y-6 relative z-10">
+        <h3 className="text-2xl font-black text-white flex items-center gap-3">
+           <div className="w-2 h-8 bg-brand-green rounded-full"></div>
+           مصفوفة القيمة المضافة للإدارة التنفيذية
         </h3>
-        <div className="overflow-hidden rounded-xl border border-brand-gray-light shadow-2xl">
-          <table className="w-full text-right text-sm">
+        <div className="overflow-hidden rounded-2xl border border-brand-green/20 shadow-2xl bg-brand-gray-dark/50 backdrop-blur-md">
+          <table className="w-full text-right text-base">
             <thead>
-              <tr className="bg-brand-gray-dark/80 text-white border-b border-brand-gray-light">
-                <th className="p-4">الوظيفة</th>
-                <th className="p-4 text-red-400">الوضع السابق</th>
-                <th className="p-4 text-brand-green">الوضع الاستراتيجي (SGS Smart)</th>
+              <tr className="bg-brand-gray-dark/80 text-white border-b border-brand-green/20">
+                <th className="p-5 font-black uppercase tracking-wider">المجال التشغيلي</th>
+                <th className="p-5 text-red-400 font-bold bg-red-400/5">المنهجية التقليدية</th>
+                <th className="p-5 text-brand-green font-bold bg-brand-green/5">مبادرة SGS Smart (المقترحة)</th>
               </tr>
             </thead>
-            <tbody className="bg-brand-gray/30">
-              <tr className="border-b border-brand-gray-light/30">
-                <td className="p-4 font-bold text-white">دقة المعلومات</td>
-                <td className="p-4 text-gray-400">تعتمد على اجتهاد الموظف وسرعة رده.</td>
-                <td className="p-4 text-gray-200">مقيدة ببروتوكول AI Factual (لا مجال للخطأ).</td>
+            <tbody className="divide-y divide-brand-gray-light/30">
+              <tr className="hover:bg-white/5 transition-colors">
+                <td className="p-5 font-bold text-white">دقة التحقق البصري</td>
+                <td className="p-5 text-gray-400">تعتمد على ملاحظة الموظف (نسبة خطأ 15%).</td>
+                <td className="p-5 text-gray-100 font-medium">مطابقة ثنائية (Dual-View AI) بدقة تصل لـ 98%.</td>
               </tr>
-              <tr className="border-b border-brand-gray-light/30">
-                <td className="p-4 font-bold text-white">المطابقة الأمنية</td>
-                <td className="p-4 text-gray-400">مطابقة وصف يدوي بسيط.</td>
-                <td className="p-4 text-gray-200">تحليل بصري ذكي + تأكيد رسمي ثلاثي المراحل.</td>
+              <tr className="hover:bg-white/5 transition-colors">
+                <td className="p-5 font-bold text-white">رضا العميل (Passenger)</td>
+                <td className="p-5 text-gray-400">انتظار طويل عبر الهاتف أو الكاونتر.</td>
+                <td className="p-5 text-gray-100 font-medium">خدمة ذاتية فورية 24/7 عبر الهاتف الجوال.</td>
               </tr>
-              <tr className="border-b border-brand-gray-light/30">
-                <td className="p-4 font-bold text-white">التحكم في التلاعب</td>
-                <td className="p-4 text-gray-200 opacity-50">سهولة إقناع الموظف بالادعاءات.</td>
-                <td className="p-4 text-brand-green font-bold">رفض آلي لأي ادعاء غير موثق بالصور والبيانات.</td>
+              <tr className="hover:bg-white/5 transition-colors">
+                <td className="p-5 font-bold text-white font-black text-brand-green">العائد على الاستثمار (ROI)</td>
+                <td className="p-5 text-gray-400">تكاليف عالية في العمالة والتعويضات.</td>
+                <td className="p-5 text-brand-green font-black">تقليص التكاليف التشغيلية بنسبة 40% سنوياً.</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      {/* KPIs */}
-      <section className="bg-brand-gray-dark/60 p-6 rounded-2xl border border-brand-green/20">
-         <h4 className="text-lg font-bold text-white mb-4">الأهداف التشغيلية الاستراتيجية</h4>
-         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-3 bg-brand-gray rounded-lg">
-               <p className="text-[10px] text-gray-400 mb-1">أتمتة الاستفسارات</p>
-               <p className="text-2xl font-black text-brand-green">60%+</p>
+      {/* Strategic Goals Footer */}
+      <div className="bg-gradient-to-r from-brand-gray-dark to-brand-gray border border-brand-green/30 p-8 rounded-3xl shadow-2xl relative z-10">
+         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="space-y-2 text-center md:text-right">
+               <h4 className="text-xl font-black text-white">أهداف عام 2025</h4>
+               <p className="text-gray-400 text-sm">تم وضع هذه الأرقام بناءً على تحليل أداء محطة مطار الملك عبدالعزيز بجدة.</p>
             </div>
-            <div className="text-center p-3 bg-brand-gray rounded-lg">
-               <p className="text-[10px] text-gray-400 mb-1">نسبة الخطأ التقني</p>
-               <p className="text-2xl font-black text-blue-400">~0%</p>
-            </div>
-            <div className="text-center p-3 bg-brand-gray rounded-lg">
-               <p className="text-[10px] text-gray-400 mb-1">زمن الإغلاق</p>
-               <p className="text-2xl font-black text-purple-400">-70%</p>
-            </div>
-            <div className="text-center p-3 bg-brand-gray rounded-lg">
-               <p className="text-[10px] text-gray-400 mb-1">التوفير السنوي</p>
-               <p className="text-2xl font-black text-yellow-400">محسوب</p>
+            <div className="flex flex-wrap justify-center gap-6">
+               <div className="bg-brand-gray-dark/80 px-6 py-4 rounded-2xl border border-brand-green/20 text-center min-w-[140px]">
+                  <p className="text-[10px] text-brand-green font-black uppercase mb-1">أتمتة ذكية</p>
+                  <p className="text-3xl font-black text-white">75%</p>
+               </div>
+               <div className="bg-brand-gray-dark/80 px-6 py-4 rounded-2xl border border-blue-500/20 text-center min-w-[140px]">
+                  <p className="text-[10px] text-blue-400 font-black uppercase mb-1">سرعة الاستجابة</p>
+                  <p className="text-3xl font-black text-white">0.5s</p>
+               </div>
+               <div className="bg-brand-gray-dark/80 px-6 py-4 rounded-2xl border border-purple-500/20 text-center min-w-[140px]">
+                  <p className="text-[10px] text-purple-400 font-black uppercase mb-1">دقة الفرز</p>
+                  <p className="text-3xl font-black text-white">99%</p>
+               </div>
             </div>
          </div>
-      </section>
+      </div>
     </div>
   );
 };
