@@ -9,6 +9,7 @@ import Card from './common/Card';
 import Modal from './common/Modal';
 import NotificationToast from './common/NotificationToast';
 import { recordToBaggageInfo } from '../utils/baggageUtils';
+import { RouteIcon } from './common/icons';
 
 const AQUATIC_BUTTON = "w-full bg-brand-green text-brand-gray-dark font-black py-4 rounded-xl shadow-[0_0_15px_rgba(52,211,153,0.3)] border border-cyan-400/50 hover:bg-brand-green-light hover:shadow-[0_0_25px_rgba(52,211,153,0.5)] transition-all transform hover:-translate-y-0.5 active:scale-95";
 const AQUATIC_SECONDARY = "w-full py-2 bg-brand-green/20 text-brand-green text-xs font-bold rounded border border-cyan-400/30 hover:bg-brand-green/40 hover:shadow-[0_0_10px_rgba(34,211,238,0.2)] transition-all relative z-10";
@@ -382,7 +383,7 @@ const PassengerView: React.FC = () => {
                         <div className="bg-brand-green/10 border-2 border-cyan-400/40 p-6 rounded-2xl shadow-xl shadow-brand-green/10 animate-in slide-in-from-top-4 duration-700">
                             <div className="flex items-start gap-4">
                                 <div className="p-3 bg-brand-green text-brand-gray-dark rounded-full shadow-lg">
-                                    {/* تم حذف أيقونة RouteIcon */}
+                                    <RouteIcon className="w-6 h-6" />
                                 </div>
                                 <div className="space-y-2">
                                     <h3 className="text-xl font-black text-brand-green">{t.pickupTitle}</h3>
