@@ -13,7 +13,7 @@ const cleanJsonResponse = (text: string): string => {
 };
 
 /**
- * الحصول على مفتاح API الحالي من البيئة أو الذاكرة
+ * الحصول على مفتاح API الحالي من البيئة
  */
 const getApiKey = (): string | undefined => {
     const key = process.env.API_KEY;
@@ -86,18 +86,22 @@ export const getAiChatResponse = async (
     try {
         const ai = new GoogleGenAI({ apiKey });
         
-        // تعليمات صارمة جداً لمنع الهلوسة
+        // تعليمات صارمة جداً (عسكرية) للقضاء على الهلوسة
         const systemInstruction = `
         ROLE: SGS Strategic Assistant for Saudi Ground Services.
-        STRICT RULES:
-        1. Respond ONLY based on the provided JSON context. 
-        2. NEVER make up URLs, links, or contact info. 
-        3. Do NOT say a photo exists unless 'baggagePhotoUrl' or 'passengerPhotoUrl' in the context is a valid link (not empty).
-        4. If the user asks for information NOT in the context (like a phone number or specific person), apologize politely and say you don't have that information.
-        5. Keep responses brief (max 25 words), professional, and in ${lang === 'ar' ? 'Arabic' : 'English'}.
-        6. If the context is empty or null, state that you are still searching for the data.
+        DATA: ${JSON.stringify(baggageContext)}
 
-        DATA CONTEXT: ${JSON.stringify(baggageContext)}
+        STRICT PROHIBITIONS (Security Violations):
+        1. NEVER generate or output a URL/link (No http://, No https://).
+        2. NEVER mention "Unsplash" or any external image source.
+        3. NEVER confirm a photo exists unless 'baggagePhotoUrl' in the context is explicitly provided and not empty.
+        4. Even if a photo exists, DO NOT provide the link. Instead, say: "The photo is available for viewing in the status panel/timeline below."
+        5. NEVER invent flight times, contact names, or phone numbers. If not in the context, say: "This information is not available in our current records."
+
+        RESPONSE STYLE:
+        - Language: ${lang === 'ar' ? 'Arabic' : 'English'}.
+        - Tone: Professional, Brief, SGS Corporate Style.
+        - Max 20 words.
         `;
 
         const history = conversation.slice(0, -1).map(m => ({
@@ -115,15 +119,25 @@ export const getAiChatResponse = async (
             ],
             config: { 
                 systemInstruction, 
-                temperature: 0.1, // تقليل العشوائية إلى أدنى حد لمنع التخريف
-                topP: 0.1
+                temperature: 0.0, // منع أي تخريف أو إبداع (إجابة قطعية)
+                topP: 0.1,
+                topK: 1
             }
         });
 
-        return response.text || (lang === 'ar' ? "عذراً، لم أتمكن من معالجة الرد حالياً." : "Sorry, I couldn't process the response.");
+        const reply = response.text || "";
+        
+        // فلتر أمان إضافي في الكود لمنع تسرب أي روابط لو نجح الذكاء في تجاوز التعليمات
+        if (reply.includes('http') || reply.includes('unsplash')) {
+            return lang === 'ar' 
+                ? "عذراً، المعلومات المطلوبة غير متوفرة في سجلاتنا الرسمية حالياً." 
+                : "Apologies, the requested information is not available in our official records.";
+        }
+
+        return reply;
     } catch (err: any) {
-        console.error("Gemini Error:", err);
-        return lang === 'ar' ? `النظام الذكي غير متاح حالياً: ${err.message}` : `Smart system unavailable: ${err.message}`;
+        console.error("Gemini Critical Error:", err);
+        return lang === 'ar' ? `النظام الذكي تحت الصيانة حالياً.` : `Smart system is under maintenance.`;
     }
 };
 
@@ -139,9 +153,7 @@ export const findPotentialMatchesByDescription = async (
     try {
         const ai = new GoogleGenAI({ apiKey });
         const bagsList = bagsToFilter.map(b => ({ pir: b.PIR, features: b.AiFeatures }));
-        const prompt = `Task: Match description "${description}" from this list: ${JSON.stringify(bagsList)}. 
-        Rule: If no strong match, return an empty array []. 
-        Output: ONLY a JSON array of PIR strings.`;
+        const prompt = `Match description "${description}" from this list: ${JSON.stringify(bagsList)}. Return ONLY a JSON array of PIR strings. Empty [] if no match.`;
 
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
@@ -173,7 +185,7 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
         model: MODEL_NAME,
         contents: [{ 
             role: 'user',
-            parts: [{ text: "Analyze baggage visually. JSON output only. If passenger name on tag is visible, extract it to 'name'." }, ...imageParts] 
+            parts: [{ text: "Analyze baggage visually. JSON output only. Extract passenger name from tags if visible." }, ...imageParts] 
         }],
         config: { responseMimeType: "application/json", temperature: 0.0 }
     });
@@ -195,7 +207,7 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
             contents: [{ 
                 role: 'user',
                 parts: [
-                    { text: "Strict Security Verification: Are these two bags the same? Compare visual details only. Start with MATCH: YES or MATCH: NO." },
+                    { text: "Security Analysis: Same bag? Answer strictly YES or NO followed by reasoning." },
                     { inlineData: { data: p64.base64, mimeType: p64.mimeType } },
                     { inlineData: { data: s64.base64, mimeType: s64.mimeType } }
                 ] 
@@ -209,7 +221,7 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
 export const getInitialBotMessage = (record: BaggageRecord, lang: 'ar' | 'en' = 'ar'): { chatResponse: string; baggageInfo: BaggageInfo } => {
     const baggageInfo = recordToBaggageInfo(record);
     const chatResponse = lang === 'ar' 
-        ? `نظام SGS الذكي يرحب بكم. تم العثور على سجل الحقيبة (${record.PIR}). كيف يمكنني خدمتك بناءً على هذه البيانات؟`
-        : `SGS Smart System welcomes you. Baggage record (${record.PIR}) located. How can I assist you with this data?`;
+        ? `أهلاً بك. تم العثور على بيانات حقيبتك (${record.PIR}). كيف يمكن لمساعد SGS الذكي خدمتك اليوم؟`
+        : `Welcome. Your baggage data (${record.PIR}) has been found. How can the SGS Smart Assistant help you today?`;
     return { chatResponse, baggageInfo };
 };
