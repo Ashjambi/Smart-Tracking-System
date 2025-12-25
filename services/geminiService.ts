@@ -53,38 +53,33 @@ export const getAiChatResponse = async (
     baggageContext: BaggageInfo,
     lang: 'ar' | 'en' = 'ar'
 ): Promise<string> => {
+    // التأكد من وجود مفتاح API قبل المحاولة لتجنب التعليق غير المبرر
+    if (!process.env.API_KEY) {
+        return lang === 'ar' ? "خطأ في تكوين الخادم: مفتاح API مفقود." : "Server Configuration Error: API Key missing.";
+    }
+
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // استخدام Gemini 3 Pro لضمان أعلى مستويات المنطق ومنع الهلوسة
-    const model = 'gemini-3-pro-preview';
+    // الانتقال إلى نموذج Flash لسرعة الاستجابة في البيئات السحابية
+    const model = 'gemini-3-flash-preview';
     
-    // فحص تقني صارم جداً للروابط قبل إرسالها للذكاء الاصطناعي
-    const hasFront = !!baggageContext.baggagePhotoUrl && baggageContext.baggagePhotoUrl.startsWith('http') && baggageContext.baggagePhotoUrl.length > 20;
-    const hasBack = !!baggageContext.baggagePhotoUrl_2 && baggageContext.baggagePhotoUrl_2.startsWith('http') && baggageContext.baggagePhotoUrl_2.length > 20;
+    const hasFront = !!baggageContext.baggagePhotoUrl && baggageContext.baggagePhotoUrl.startsWith('http');
+    const hasBack = !!baggageContext.baggagePhotoUrl_2 && baggageContext.baggagePhotoUrl_2.startsWith('http');
     const totalPhotos = (hasFront ? 1 : 0) + (hasBack ? 1 : 0);
 
     const systemInstruction = `
-    IDENTITY: You are the SGS Smart Auditor. You are NOT a helpful concierge, you are a TECHNICAL LOG AUDITOR.
+    IDENTITY: You are the SGS Smart Auditor for Saudi Ground Services. 
+    DATA SOURCE: ${JSON.stringify(baggageContext)}
     
-    DATA SOURCE (TRUTH): ${JSON.stringify(baggageContext)}
+    PHOTO_AVAILABILITY:
+    - Front: ${hasFront ? 'YES' : 'NO'}
+    - Back: ${hasBack ? 'YES' : 'NO'}
+    - Total: ${totalPhotos}
     
-    VERIFIED_IMAGE_STATUS (MANDATORY):
-    - Photo_Front_In_Database: ${hasFront ? 'YES (Link Active)' : 'NO (Null/Empty)'}
-    - Photo_Back_In_Database: ${hasBack ? 'YES (Link Active)' : 'NO (Null/Empty)'}
-    - TOTAL_PHOTOS_AVAILABLE: ${totalPhotos}
-    
-    CRITICAL SECURITY RULES:
-    1. IF TOTAL_PHOTOS_AVAILABLE IS 0: You are FORBIDDEN from saying "نعم" (Yes) or "متوفر" (Available) regarding photos. You MUST apologize and state that no images are registered in the current record.
-    2. TRUTH OVER COURTESY: It is better to say "I don't know" or "Data not available" than to provide a false confirmation. False confirmation is a SECURITY BREACH.
-    3. NO HALLUCINATION: If the data says location is "LHR", do not say "المطار" generally, say "LHR". If no location is provided, say "Location not registered".
-    4. NO LINKS: NEVER generate or mention URLs/links.
-    5. OWNERSHIP: You cannot confirm ownership. Only the "Confirm Ownership" button in the UI can do that.
-    6. LENGTH: Keep responses under 25 words.
-    
-    RESPONSE PROTOCOL FOR PHOTO QUESTIONS:
-    - User: "هل يوجد صورة؟" (Is there a photo?)
-    - If TOTAL_PHOTOS_AVAILABLE = 0 -> "نعتذر، لا تتوفر صور ملتقطة لهذه الحقيبة في سجلاتنا الرسمية حالياً."
-    - If TOTAL_PHOTOS_AVAILABLE = 1 -> "نعم، تتوفر صورة واحدة للحقيبة من زاوية واحدة."
-    - If TOTAL_PHOTOS_AVAILABLE = 2 -> "نعم، تتوفر صورتان للحقيبة (توثيق مزدوج) في النظام."
+    RULES:
+    1. Only provide info found in DATA SOURCE.
+    2. If asked about photos and Total=0, say none are available.
+    3. Keep responses extremely concise (max 20 words).
+    4. Never mention internal IDs or URLs.
     `;
 
     const contents = conversation.map(m => ({
@@ -98,15 +93,16 @@ export const getAiChatResponse = async (
             contents, 
             config: { 
                 systemInstruction,
-                temperature: 0.0, // قتل الإبداع لضمان الالتزام بالنص
-                thinkingConfig: { thinkingBudget: 2000 } // إجبار النموذج على تحليل البيانات قبل الرد
+                temperature: 0.1,
+                // تعطيل التفكير العميق (Thinking) لضمان سرعة الرد اللحظية وتجنب التوقف
+                thinkingConfig: { thinkingBudget: 0 } 
             } 
         });
         
-        return response.text ?? (lang === 'ar' ? "لا توجد بيانات متاحة." : "No data available.");
+        return response.text || (lang === 'ar' ? "لا توجد بيانات متاحة حالياً." : "No data available at the moment.");
     } catch (err) {
-        console.error("Gemini AI Core Error:", err);
-        return lang === 'ar' ? "عفواً، واجهت مشكلة في الوصول للسجلات." : "Error accessing records.";
+        console.error("Chat API Error:", err);
+        return lang === 'ar' ? "نواجه ضغطاً في الطلبات حالياً، يرجى المحاولة بعد قليل." : "We are experiencing high traffic, please try again shortly.";
     }
 };
 
@@ -116,14 +112,12 @@ export const findPotentialMatchesByDescription = async (
     imageUrl?: string,
     lang: 'ar' | 'en' = 'ar'
 ): Promise<BaggageRecord[]> => {
-    if (bagsToFilter.length === 0) return [];
+    if (bagsToFilter.length === 0 || !process.env.API_KEY) return [];
+    
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = 'gemini-3-flash-preview';
     const bagsList = bagsToFilter.map(b => ({ pir: b.PIR, features: b.AiFeatures }));
-    const prompt = `SGS Baggage Search Protocol:
-    1. Analyze description: "${description}"
-    2. List of warehouse bags: ${JSON.stringify(bagsList)}
-    3. Identify PIRs with >90% confidence. Return ONLY a JSON array.`;
+    const prompt = `Match description "${description}" against: ${JSON.stringify(bagsList)}. Return ONLY a JSON array of matching PIRs.`;
 
     try {
         const response = await ai.models.generateContent({
@@ -131,7 +125,9 @@ export const findPotentialMatchesByDescription = async (
             contents: [{ parts: [{ text: prompt }] }],
             config: { responseMimeType: "application/json", temperature: 0.0 }
         });
-        const matchingPirs: string[] = JSON.parse(cleanJsonResponse(response.text || '[]'));
+        const textResponse = response.text;
+        if (!textResponse) return [];
+        const matchingPirs: string[] = JSON.parse(cleanJsonResponse(textResponse));
         return bagsToFilter.filter(b => matchingPirs.includes(b.PIR));
     } catch { return []; }
 };
@@ -141,6 +137,8 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
     description: string,
     features: AiFeatures 
 }> => {
+    if (!process.env.API_KEY) throw new Error("API Key missing");
+    
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = 'gemini-3-flash-preview'; 
     try {
@@ -153,16 +151,18 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
             model,
             contents: [{ 
                 parts: [
-                    { text: "Analyze these photos of the SAME baggage for Saudi Ground Services (SGS). Extract visual details and return ONLY a JSON object: { \"name\": \"Optional Passenger Name\", \"description\": \"summary\", \"features\": { \"brand\": \"string\", \"color\": \"string\", \"size\": \"Small|Medium|Large|Extra Large\", \"type\": \"string\", \"distinctiveMarks\": \"string\" } }." }, 
+                    { text: "Analyze baggage for SGS. Return JSON: { \"name\": \"string\", \"description\": \"string\", \"features\": { \"brand\": \"string\", \"color\": \"string\", \"size\": \"Small|Medium|Large|Extra Large\", \"type\": \"string\", \"distinctiveMarks\": \"string\" } }" }, 
                     ...imageParts
                 ] 
             }],
             config: { responseMimeType: "application/json", temperature: 0.1 }
         });
-        const result = JSON.parse(cleanJsonResponse(response.text || '{}'));
-        return result;
+        
+        const textResponse = response.text;
+        if (!textResponse) throw new Error("Empty response");
+        return JSON.parse(cleanJsonResponse(textResponse));
     } catch (error) { 
-        console.error("Gemini Photo Analysis Error:", error);
+        console.error("Photo Analysis Error:", error);
         throw new Error("Analysis failed"); 
     }
 };
@@ -170,24 +170,28 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
 export const getInitialBotMessage = (record: BaggageRecord, lang: 'ar' | 'en' = 'ar'): { chatResponse: string; baggageInfo: BaggageInfo } => {
     const baggageInfo = recordToBaggageInfo(record);
     const chatResponse = lang === 'ar' 
-        ? `أهلاً بك في SGS. تم تحديد موقع حقيبتك (${record.PIR}). تفاصيل الحالة متاحة بالأسفل.`
-        : `Welcome to SGS. Bag (${record.PIR}) located. Details below.`;
+        ? `تم تحديد سجل الحقيبة (${record.PIR}). كيف يمكنني مساعدتكم بخصوص هذه الرحلة؟`
+        : `Baggage record (${record.PIR}) located. How can I assist you further?`;
     return { chatResponse, baggageInfo };
 };
 
 export const compareBaggageImages = async (pImg: string, sImg: string) => {
+    if (!process.env.API_KEY) return "ERROR: API KEY MISSING";
+    
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = 'gemini-3-flash-preview';
-    const [p64, s64] = await Promise.all([imageToBase64(pImg), imageToBase64(sImg)]);
-    const response = await ai.models.generateContent({
-        model,
-        contents: [{ 
-            parts: [
-                { text: "SGS Security: Compare these 2 bags. Is it a match? Return MATCH or NO_MATCH plus reason." },
-                { inlineData: { data: p64.base64, mimeType: p64.mimeType } },
-                { inlineData: { data: s64.base64, mimeType: s64.mimeType } }
-            ] 
-        }]
-    });
-    return response.text ?? "NO_MATCH";
+    try {
+        const [p64, s64] = await Promise.all([imageToBase64(pImg), imageToBase64(sImg)]);
+        const response = await ai.models.generateContent({
+            model,
+            contents: [{ 
+                parts: [
+                    { text: "Compare 2 bags. Is it a match? Return MATCH or NO_MATCH + reason." },
+                    { inlineData: { data: p64.base64, mimeType: p64.mimeType } },
+                    { inlineData: { data: s64.base64, mimeType: s64.mimeType } }
+                ] 
+            }]
+        });
+        return response.text || "NO_MATCH";
+    } catch { return "MATCH_SERVICE_UNAVAILABLE"; }
 };
