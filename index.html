@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
   <head>
@@ -6,6 +7,15 @@
     <title>مبادرة SGS الاستراتيجية 2025 | نظام تتبع الأمتعة الذكي</title>
     <meta name="description" content="نظام ذكي متطور مدعوم بالذكاء الاصطناعي لتحسين العمليات اللوجستية وتجربة المسافرين في الشركة السعودية للخدمات الأرضية.">
     
+    <!-- Global Process Polyfill - Must be first -->
+    <script>
+      window.process = {
+        env: {
+          API_KEY: undefined
+        }
+      };
+    </script>
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

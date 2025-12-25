@@ -11,16 +11,22 @@ const cleanJsonResponse = (text: string): string => {
 };
 
 /**
- * وظيفة للوصول الآمن لمفتاح API دون التسبب في خطأ ReferenceError
+ * الوصول الآمن لمفتاح API
+ * في بيئة المتصفح، إذا لم يتم حقن المفتاح أثناء البناء، سيعود undefined
  */
-const getSafeApiKey = (): string | undefined => {
+const getApiKey = (): string | undefined => {
     try {
-        // نتحقق أولاً من وجود الكائن process لتجنب ReferenceError
-        if (typeof process !== 'undefined' && process.env) {
-            return process.env.API_KEY;
+        // نستخدم الوصول المباشر كما تنص التعليمات، والـ Polyfill في index.tsx سيمنع الانهيار
+        const key = process.env.API_KEY;
+        
+        // التحقق مما إذا كان المفتاح صالحاً (ليس فارغاً أو نصاً افتراضياً)
+        if (key && key !== 'undefined' && key !== 'null' && key.length > 10) {
+            return key;
+        } else {
+            console.warn("⚠️ SGS Digital Hub: API_KEY is missing or invalid. Check Cloudflare Build Variables.");
         }
     } catch (e) {
-        console.warn("Unable to access process.env safely:", e);
+        console.error("❌ Critical: process.env is not accessible.");
     }
     return undefined;
 };
@@ -68,60 +74,41 @@ export const getAiChatResponse = async (
     baggageContext: BaggageInfo,
     lang: 'ar' | 'en' = 'ar'
 ): Promise<string> => {
-    const apiKey = getSafeApiKey();
+    const apiKey = getApiKey();
     
     if (!apiKey) {
-        console.error("Gemini Error: API_KEY is not defined in the current environment.");
         return lang === 'ar' 
-            ? "تنبيه النظام: لم يتم العثور على مفتاح API. يرجى التأكد من إضافة API_KEY في إعدادات Cloudflare Pages وإعادة بناء التطبيق." 
-            : "System Alert: API_KEY not found. Please ensure it's added to Cloudflare Pages settings and re-deploy.";
+            ? "تنبيه استراتيجي: مفتاح الـ API غير مُعرف في إعدادات Cloudflare. يرجى مراجعة اللوجات وإضافة API_KEY تحت تبويب Environment Variables." 
+            : "Strategic Alert: API Key is not defined in Cloudflare settings. Please check Environment Variables.";
     }
 
-    const ai = new GoogleGenAI({ apiKey });
-    const modelName = 'gemini-3-flash-preview';
-
-    const systemInstruction = `
-    IDENTITY: SGS Smart Assistant for Saudi Ground Services.
-    LANGUAGE: Respond in ${lang === 'ar' ? 'Arabic' : 'English'}.
-    CONTEXT: ${JSON.stringify(baggageContext)}
-    
-    RULES:
-    1. Respond based ONLY on CONTEXT.
-    2. Be brief (max 20 words).
-    3. If status is "Delivered", be polite and professional.
-    `;
-
     try {
+        const ai = new GoogleGenAI({ apiKey });
+        const systemInstruction = `
+        IDENTITY: SGS Smart Assistant for Saudi Ground Services.
+        LANGUAGE: Respond in ${lang === 'ar' ? 'Arabic' : 'English'}.
+        CONTEXT: ${JSON.stringify(baggageContext)}
+        RULES: Be brief (max 20 words), polite, and use context info only.
+        `;
+
         const history = conversation.slice(0, -1).map(m => ({
             role: m.sender === MessageSender.USER ? 'user' : 'model',
             parts: [{ text: m.text || "" }]
         })).filter(h => h.parts[0].text !== "");
 
-        // ضمان تعاقب الأدوار (يجب أن يبدأ بـ User)
-        if (history.length > 0 && history[0].role === 'model') {
-            history.shift();
-        }
+        if (history.length > 0 && history[0].role === 'model') history.shift();
 
         const chat = ai.chats.create({
-            model: modelName,
-            config: {
-                systemInstruction,
-                temperature: 0.2,
-                thinkingConfig: { thinkingBudget: 0 }
-            },
-            history: history
+            model: 'gemini-3-flash-preview',
+            config: { systemInstruction, temperature: 0.2 },
+            history
         });
 
-        const lastMessage = conversation[conversation.length - 1];
-        const response = await chat.sendMessage({ message: lastMessage.text });
-        
-        return response.text || "No response text found.";
-
+        const response = await chat.sendMessage({ message: conversation[conversation.length - 1].text });
+        return response.text || "No response";
     } catch (err: any) {
-        console.error("Detailed Chat Error:", err);
-        return lang === 'ar' 
-            ? `حدث خطأ أثناء الاتصال: ${err.message || 'خطأ غير معروف'}`
-            : `Connection error: ${err.message || 'Unknown error'}`;
+        console.error("Gemini Error:", err);
+        return lang === 'ar' ? `خطأ في الاتصال بالسحابة الذكية: ${err.message}` : `Cloud Connection Error: ${err.message}`;
     }
 };
 
@@ -131,22 +118,18 @@ export const findPotentialMatchesByDescription = async (
     imageUrl?: string,
     lang: 'ar' | 'en' = 'ar'
 ): Promise<BaggageRecord[]> => {
-    const apiKey = getSafeApiKey();
+    const apiKey = getApiKey();
     if (!apiKey || bagsToFilter.length === 0) return [];
     
-    const ai = new GoogleGenAI({ apiKey });
-    const bagsList = bagsToFilter.map(b => ({ pir: b.PIR, features: b.AiFeatures }));
-    const prompt = `Match description "${description}" from: ${JSON.stringify(bagsList)}. Return ONLY a JSON array of PIR strings.`;
-
     try {
+        const ai = new GoogleGenAI({ apiKey });
+        const bagsList = bagsToFilter.map(b => ({ pir: b.PIR, features: b.AiFeatures }));
+        const prompt = `Match description "${description}" from: ${JSON.stringify(bagsList)}. Return ONLY a JSON array of PIR strings.`;
+
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: { 
-                responseMimeType: "application/json", 
-                temperature: 0.0,
-                thinkingConfig: { thinkingBudget: 0 }
-            }
+            config: { responseMimeType: "application/json", temperature: 0.0 }
         });
         const textResponse = response.text;
         if (!textResponse) return [];
@@ -160,39 +143,27 @@ export const analyzeFoundBaggagePhoto = async (imageUrls: string[]): Promise<{
     description: string,
     features: AiFeatures 
 }> => {
-    const apiKey = getSafeApiKey();
+    const apiKey = getApiKey();
     if (!apiKey) throw new Error("API Key missing");
     
     const ai = new GoogleGenAI({ apiKey });
-    try {
-        const imageParts = await Promise.all(imageUrls.map(async (url) => {
-            const { base64, mimeType } = await imageToBase64(url);
-            return { inlineData: { data: base64, mimeType } };
-        }));
+    const imageParts = await Promise.all(imageUrls.map(async (url) => {
+        const { base64, mimeType } = await imageToBase64(url);
+        return { inlineData: { data: base64, mimeType } };
+    }));
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: [{ 
-                role: 'user',
-                parts: [
-                    { text: "Analyze baggage and return JSON structure." }, 
-                    ...imageParts
-                ] 
-            }],
-            config: { 
-                responseMimeType: "application/json", 
-                temperature: 0.1,
-                thinkingConfig: { thinkingBudget: 0 }
-            }
-        });
-        
-        const textResponse = response.text;
-        if (!textResponse) throw new Error("Empty response");
-        return JSON.parse(cleanJsonResponse(textResponse));
-    } catch (error) { 
-        console.error("Photo Analysis Error:", error);
-        throw new Error("Analysis failed"); 
-    }
+    const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [{ 
+            role: 'user',
+            parts: [{ text: "Analyze baggage and return JSON structure." }, ...imageParts] 
+        }],
+        config: { responseMimeType: "application/json", temperature: 0.1 }
+    });
+    
+    const textResponse = response.text;
+    if (!textResponse) throw new Error("Empty response");
+    return JSON.parse(cleanJsonResponse(textResponse));
 };
 
 export const getInitialBotMessage = (record: BaggageRecord, lang: 'ar' | 'en' = 'ar'): { chatResponse: string; baggageInfo: BaggageInfo } => {
@@ -204,7 +175,7 @@ export const getInitialBotMessage = (record: BaggageRecord, lang: 'ar' | 'en' = 
 };
 
 export const compareBaggageImages = async (pImg: string, sImg: string) => {
-    const apiKey = getSafeApiKey();
+    const apiKey = getApiKey();
     if (!apiKey) return "ERROR: API KEY MISSING";
     
     const ai = new GoogleGenAI({ apiKey });
@@ -215,15 +186,12 @@ export const compareBaggageImages = async (pImg: string, sImg: string) => {
             contents: [{ 
                 role: 'user',
                 parts: [
-                    { text: "Compare 2 bags images and determine if they match." },
+                    { text: "Compare these 2 bag images. Determine if they are the same bag." },
                     { inlineData: { data: p64.base64, mimeType: p64.mimeType } },
                     { inlineData: { data: s64.base64, mimeType: s64.mimeType } }
                 ] 
             }],
-            config: { 
-                temperature: 0,
-                thinkingConfig: { thinkingBudget: 0 }
-            }
+            config: { temperature: 0 }
         });
         return response.text || "NO_MATCH";
     } catch { return "MATCH_SERVICE_UNAVAILABLE"; }
