@@ -1,8 +1,9 @@
+
 {
   "name": "sgs-strategic-initiative-2025",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "mkdir -p dist && cp index.html index.tsx metadata.json types.ts constants.ts _redirects dist/ && cp -r components contexts services utils dist/ 2>/dev/null || true"
+    "build": "mkdir -p dist && cp index.html index.tsx metadata.json types.ts constants.ts _redirects wrangler.json dist/ && cp -r components contexts services utils dist/ 2>/dev/null || true"
   }
 }
